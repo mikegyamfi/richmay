@@ -726,7 +726,7 @@ def admin_at_history(request):
 @login_required(login_url='login')
 def admin_mtn_history(request):
     if request.user.is_staff and request.user.is_superuser:
-        all_txns = models.MTNTransaction.objects.all()
+        all_txns = models.MTNTransaction.objects.filter().order_by('-transaction_date')
         context = {'txns': all_txns}
         return render(request, "layouts/services/mtn_admin.html", context=context)
 
