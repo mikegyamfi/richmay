@@ -327,8 +327,8 @@ def mtn_pay_with_wallet(request):
                 'sender_id': 'Data4All',
                 'message': sms_message
             }
-            response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
-            print(response.text)
+            # response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
+            # print(response.text)
             return JsonResponse({'status': "Your transaction will be completed shortly", 'icon': 'success'})
     return redirect('mtn')
 
