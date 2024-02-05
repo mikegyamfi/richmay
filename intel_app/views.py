@@ -1104,6 +1104,7 @@ def hubtel_webhook(request):
                     print(user)
                     print(reference)
                     send_bundle_response = helper.send_bundle(user, phone_number, bundle, reference)
+                    print("after the send bundle response")
                     data = send_bundle_response.json()
 
                     print(data)

@@ -68,9 +68,9 @@ def send_bundle(user, receiver, bundle_amount, reference):
         "reference": reference,
         "bundle_amount": bundle_amount
     })
-
+    print("herrrrreeeeeeeee")
     response = requests.request("POST", url, headers=headers, data=payload)
-
+    print("git here")
     print(response.json)
     return response
 
