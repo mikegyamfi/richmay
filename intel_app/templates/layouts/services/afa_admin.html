@@ -26,6 +26,7 @@
                         <th scope="col">Card#</th>
                         <th scope="col">Occupation</th>
                         <th scope="col">Date of Birth</th>
+                        <th scope="col">Location</th>
                         <th scope="col">Status</th>
                         <th>Action</th>
                     </tr>
@@ -39,6 +40,7 @@
                             <td>{{txn.gh_card_number}}</td>
                             <td>{{txn.occupation}}</td>
                             <td>{{txn.date_of_birth}}</td>
+                            <td>{{txn.location}}</td>
                             {% if txn.transaction_status == "Completed" %}
                             <td><span class="badge badge-pill badge-success me-1">{{txn.transaction_status}}</span></td>
                             {% else %}
