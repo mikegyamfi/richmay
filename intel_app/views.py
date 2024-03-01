@@ -35,9 +35,17 @@ def pay_with_wallet(request):
         if user.wallet is None:
             return JsonResponse(
                 {'status': f'Your wallet balance is low. Contact the admin to recharge. Admin Contact Info: 0{admin}'})
-        elif user.wallet <= 0 or user.wallet < float(amount):
+        if float(user.wallet) == 0.0:
             return JsonResponse(
-                {'status': f'Your wallet balance is low. Contact the admin to recharge. Admin Contact Info: 0{admin}'})
+                {'status': f'Your wallet balance is low. Contact the admin to recharge.'})
+        if float(user.wallet) < float(amount):
+            return JsonResponse(
+                {
+                    'status': f'Your wallet balance is low. Contact the admin to recharge. Admin Contact Info: 0{admin}'})
+        if float(amount) > float(user.wallet):
+            return JsonResponse(
+                {
+                    'status': f'Your wallet balance is low. Contact the admin to recharge. Admin Contact Info: 0{admin}'})
         print(phone_number)
         print(amount)
         print(reference)
@@ -267,7 +275,13 @@ def mtn_pay_with_wallet(request):
         if user.wallet is None:
             return JsonResponse(
                 {'status': f'Your wallet balance is low. Contact the admin to recharge. Admin Contact Info: 0{admin}'})
-        elif user.wallet <= 0 or user.wallet < float(amount):
+        if float(user.wallet) == 0.0:
+            return JsonResponse(
+                {'status': f'Your wallet balance is low. Contact the admin to recharge.'})
+        if float(user.wallet) < float(amount):
+            return JsonResponse(
+                {'status': f'Your wallet balance is low. Contact the admin to recharge. Admin Contact Info: 0{admin}'})
+        if float(amount) > float(user.wallet):
             return JsonResponse(
                 {'status': f'Your wallet balance is low. Contact the admin to recharge. Admin Contact Info: 0{admin}'})
         if user.status == "User":
@@ -346,9 +360,17 @@ def big_time_pay_with_wallet(request):
         if user.wallet is None:
             return JsonResponse(
                 {'status': f'Your wallet balance is low. Contact the admin to recharge.'})
-        elif user.wallet <= 0 or user.wallet < float(amount):
+        if float(user.wallet) == 0.0:
             return JsonResponse(
                 {'status': f'Your wallet balance is low. Contact the admin to recharge.'})
+        if float(user.wallet) < float(amount):
+            return JsonResponse(
+                {
+                    'status': f'Your wallet balance is low. Contact the admin to recharge.'})
+        if float(amount) > float(user.wallet):
+            return JsonResponse(
+                {
+                    'status': f'Your wallet balance is low. Contact the admin to recharge.'})
         if user.status == "User":
             bundle = models.BigTimeBundlePrice.objects.get(price=float(amount)).bundle_volume
         elif user.status == "Agent":
@@ -571,9 +593,17 @@ def afa_registration_wallet(request):
         if user.wallet is None:
             return JsonResponse(
                 {'status': f'Your wallet balance is low. Contact the admin to recharge.'})
-        elif user.wallet <= 0 or user.wallet < float(amount):
+        if float(user.wallet) == 0.0:
             return JsonResponse(
                 {'status': f'Your wallet balance is low. Contact the admin to recharge.'})
+        if float(user.wallet) < float(amount):
+            return JsonResponse(
+                {
+                    'status': f'Your wallet balance is low. Contact the admin to recharge.'})
+        if float(amount) > float(user.wallet):
+            return JsonResponse(
+                {
+                    'status': f'Your wallet balance is low. Contact the admin to recharge.'})
 
         new_registration = models.AFARegistration.objects.create(
             user=user,
