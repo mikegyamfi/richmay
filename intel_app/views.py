@@ -3,9 +3,12 @@ from datetime import datetime
 
 import pandas as pd
 from decouple import config
+from django.contrib.auth.forms import PasswordResetForm
 from django.shortcuts import render, redirect
 from django.http import JsonResponse, HttpResponseRedirect
 import requests
+from django.template.loader import render_to_string
+from django.utils.http import urlsafe_base64_encode
 from django.views.decorators.csrf import csrf_exempt
 
 from . import forms
@@ -25,6 +28,7 @@ def services(request):
     return render(request, "layouts/services.html")
 
 
+@login_required(login_url='login')
 def pay_with_wallet(request):
     if request.method == "POST":
         admin = models.AdminInfo.objects.filter().first().phone_number
@@ -32,10 +36,15 @@ def pay_with_wallet(request):
         phone_number = request.POST.get("phone")
         amount = request.POST.get("amount")
         reference = request.POST.get("reference")
+        if float(user.wallet) - float(amount) < 0:
+            return JsonResponse(
+                {'status': f'Your wallet balance is low. Contact the admin to recharge. Admin Contact Info: 0{admin}'})
         if user.wallet is None:
             return JsonResponse(
                 {'status': f'Your wallet balance is low. Contact the admin to recharge. Admin Contact Info: 0{admin}'})
-        if float(user.wallet) == 0.0:
+        if float(user.wallet) == 0.0 or float(user.wallet) < 0:
+            user.wallet = 0.0
+            user.save()
             return JsonResponse(
                 {'status': f'Your wallet balance is low. Contact the admin to recharge.'})
         if float(user.wallet) < float(amount):
@@ -253,6 +262,7 @@ def airtel_tigo(request):
     return render(request, "layouts/services/at.html", context=context)
 
 
+@login_required(login_url='login')
 def mtn_pay_with_wallet(request):
     if request.method == "POST":
         user = models.CustomUser.objects.get(id=request.user.id)
@@ -272,10 +282,16 @@ def mtn_pay_with_wallet(request):
         admin = models.AdminInfo.objects.filter().first().phone_number
         api_status = models.AdminInfo.objects.filter().first().mtn_api_status
 
+
+        if float(user.wallet) - float(amount) < 0:
+            return JsonResponse(
+                {'status': f'Your wallet balance is low. Contact the admin to recharge. Admin Contact Info: 0{admin}'})
         if user.wallet is None:
             return JsonResponse(
                 {'status': f'Your wallet balance is low. Contact the admin to recharge. Admin Contact Info: 0{admin}'})
-        if float(user.wallet) == 0.0:
+        if float(user.wallet) == 0.0 or float(user.wallet) < 0:
+            user.wallet = 0.0
+            user.save()
             return JsonResponse(
                 {'status': f'Your wallet balance is low. Contact the admin to recharge.'})
         if float(user.wallet) < float(amount):
@@ -357,10 +373,15 @@ def big_time_pay_with_wallet(request):
         print(phone_number)
         print(amount)
         print(reference)
+        if float(user.wallet) - float(amount) < 0:
+            return JsonResponse(
+                {'status': f'Your wallet balance is low. Contact the admin to recharge. Admin Contact Info: 0{admin}'})
         if user.wallet is None:
             return JsonResponse(
                 {'status': f'Your wallet balance is low. Contact the admin to recharge.'})
-        if float(user.wallet) == 0.0:
+        if float(user.wallet) == 0.0 or float(user.wallet) < 0:
+            user.wallet = 0.0
+            user.save()
             return JsonResponse(
                 {'status': f'Your wallet balance is low. Contact the admin to recharge.'})
         if float(user.wallet) < float(amount):
@@ -576,6 +597,7 @@ def afa_registration(request):
     return render(request, "layouts/services/afa.html", context=context)
 
 
+@login_required(login_url='login')
 def afa_registration_wallet(request):
     if request.method == "POST":
         user = models.CustomUser.objects.get(id=request.user.id)
@@ -590,10 +612,15 @@ def afa_registration_wallet(request):
         print(location)
         price = models.AdminInfo.objects.filter().first().afa_price
 
+        if float(user.wallet) - float(amount) < 0:
+            return JsonResponse(
+                {'status': f'Your wallet balance is low. Contact the admin to recharge.'})
         if user.wallet is None:
             return JsonResponse(
                 {'status': f'Your wallet balance is low. Contact the admin to recharge.'})
-        if float(user.wallet) == 0.0:
+        if float(user.wallet) == 0.0 or float(user.wallet) < 0:
+            user.wallet = 0.0
+            user.save()
             return JsonResponse(
                 {'status': f'Your wallet balance is low. Contact the admin to recharge.'})
         if float(user.wallet) < float(amount):
@@ -941,7 +968,7 @@ def topup_info(request):
         new_topup_request = models.TopUpRequest.objects.create(
             user=request.user,
             amount=amount,
-            reference=reference,
+            reference=request.user,
         )
         new_topup_request.save()
 
@@ -960,7 +987,7 @@ def topup_info(request):
         }
         response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
         print(response.text)
-        messages.success(request, f"Your Request has been sent successfully. Kindly go on to pay to {admin} and use the reference stated as reference. Reference: {reference}")
+        messages.success(request, f"Your Request has been sent successfully. Kindly go on to pay to {admin} and use the reference stated as reference. Reference: {request.user.username}")
         return redirect("request_successful", reference)
     # if request.method == "POST":
     #     admin = models.AdminInfo.objects.filter().first().phone_number
@@ -1372,5 +1399,54 @@ def populate_custom_users_from_excel(request):
 def delete_custom_users(request):
     CustomUser.objects.all().delete()
     return HttpResponseRedirect('Done')
+
+
+from django.utils.encoding import force_bytes
+from django.contrib.auth.tokens import default_token_generator
+
+def password_reset_request(request):
+    if request.method == "POST":
+        password_reset_form = PasswordResetForm(request.POST)
+        if password_reset_form.is_valid():
+            data = password_reset_form.cleaned_data['email']
+            user = models.CustomUser.objects.filter(email=data).first()
+            current_user = user
+            if user:
+                subject = "Password Reset Requested"
+                email_template_name = "password/password_reset_message.txt"
+                c = {
+                    "name": user.first_name,
+                    "email": user.email,
+                    'domain': 'www.dataforall.store',
+                    'site_name': 'Data4All',
+                    "uid": urlsafe_base64_encode(force_bytes(user.pk)),
+                    "user": user,
+                    'token': default_token_generator.make_token(user),
+                    'protocol': 'https',
+                }
+                email = render_to_string(email_template_name, c)
+
+                sms_headers = {
+                    'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
+                    'Content-Type': 'application/json'
+                }
+
+                sms_url = 'https://webapp.usmsgh.com/api/sms/send'
+
+                sms_body = {
+                    'recipient': f"233{user.phone}",
+                    'sender_id': 'Data4All',
+                    'message': email
+                }
+                response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
+                print(response.text)
+                # requests.get(
+                #     f"https://sms.arkesel.com/sms/api?action=send-sms&api_key=UnBzemdvanJyUGxhTlJzaVVQaHk&to=0{current_user.phone}&from=GEO_AT&sms={email}")
+
+                return redirect("/password_reset/done/")
+    password_reset_form = PasswordResetForm()
+    return render(request=request, template_name="password/password_reset.html",
+                  context={"password_reset_form": password_reset_form})
+
 
 
