@@ -988,7 +988,7 @@ def topup_info(request):
         response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
         print(response.text)
         messages.success(request, f"Your Request has been sent successfully. Kindly go on to pay to {admin} and use the reference stated as reference. Reference: {str(request.user.username)}")
-        return redirect("request_successful", reference)
+        return redirect("request_successful", str(request.user.username))
     # if request.method == "POST":
     #     admin = models.AdminInfo.objects.filter().first().phone_number
     #     user = models.CustomUser.objects.get(id=request.user.id)
