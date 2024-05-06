@@ -968,7 +968,7 @@ def topup_info(request):
         new_topup_request = models.TopUpRequest.objects.create(
             user=request.user,
             amount=amount,
-            reference=request.user,
+            reference=str(request.user.username),
         )
         new_topup_request.save()
 
@@ -987,7 +987,7 @@ def topup_info(request):
         }
         response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
         print(response.text)
-        messages.success(request, f"Your Request has been sent successfully. Kindly go on to pay to {admin} and use the reference stated as reference. Reference: {request.user.username}")
+        messages.success(request, f"Your Request has been sent successfully. Kindly go on to pay to {admin} and use the reference stated as reference. Reference: {str(request.user.username)}")
         return redirect("request_successful", reference)
     # if request.method == "POST":
     #     admin = models.AdminInfo.objects.filter().first().phone_number
