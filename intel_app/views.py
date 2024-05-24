@@ -24,11 +24,10 @@ def home(request):
     if models.Announcement.objects.filter(active=True).exists():
         announcement = models.Announcement.objects.filter(active=True).first()
         messages.info(request, announcement.message)
-        if request.user.is_authenticated:
-            user = models.CustomUser.objects.get(id=request.user.id)
-            context = {'wallet': user.wallet}
-            return render(request, "layouts/index.html", context=context)
-        return render(request, "layouts/index.html")
+    if request.user.is_authenticated:
+        user = models.CustomUser.objects.get(id=request.user.id)
+        context = {'wallet': user.wallet}
+        return render(request, "layouts/index.html", context=context)
     return render(request, "layouts/index.html")
 
 
@@ -36,11 +35,10 @@ def services(request):
     if models.Announcement.objects.filter(active=True).exists():
         announcement = models.Announcement.objects.filter(active=True).first()
         messages.info(request, announcement.message)
-        if request.user.is_authenticated:
-            user = models.CustomUser.objects.get(id=request.user.id)
-            context = {'wallet': user.wallet}
-            return render(request, "layouts/services.html", context=context)
-        return render(request, "layouts/services.html")
+    if request.user.is_authenticated:
+        user = models.CustomUser.objects.get(id=request.user.id)
+        context = {'wallet': user.wallet}
+        return render(request, "layouts/services.html", context=context)
     return render(request, "layouts/services.html")
 
 
