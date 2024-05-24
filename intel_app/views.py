@@ -21,10 +21,26 @@ from .models import CustomUser
 
 # Create your views here.
 def home(request):
+    if models.Announcement.objects.filter(active=True).exists():
+        announcement = models.Announcement.objects.filter(active=True).first()
+        messages.info(request, announcement.message)
+        if request.user.is_authenticated:
+            user = models.CustomUser.objects.get(id=request.user.id)
+            context = {'wallet': user.wallet}
+            return render(request, "layouts/index.html", context=context)
+        return render(request, "layouts/index.html")
     return render(request, "layouts/index.html")
 
 
 def services(request):
+    if models.Announcement.objects.filter(active=True).exists():
+        announcement = models.Announcement.objects.filter(active=True).first()
+        messages.info(request, announcement.message)
+        if request.user.is_authenticated:
+            user = models.CustomUser.objects.get(id=request.user.id)
+            context = {'wallet': user.wallet}
+            return render(request, "layouts/services.html", context=context)
+        return render(request, "layouts/services.html")
     return render(request, "layouts/services.html")
 
 
@@ -375,7 +391,7 @@ def big_time_pay_with_wallet(request):
         print(reference)
         if float(user.wallet) - float(amount) < 0:
             return JsonResponse(
-                {'status': f'Your wallet balance is low. Contact the admin to recharge. Admin Contact Info: 0{admin}'})
+                {'status': f'Your wallet balance is low. Contact the admin to recharge.'})
         if user.wallet is None:
             return JsonResponse(
                 {'status': f'Your wallet balance is low. Contact the admin to recharge.'})
@@ -721,7 +737,8 @@ def history(request):
         'transaction_date').reverse()
     header = "AirtelTigo Transactions"
     net = "tigo"
-    context = {'txns': user_transactions, "header": header, "net": net}
+    user = models.CustomUser.objects.get(id=request.user.id)
+    context = {'txns': user_transactions, "header": header, "net": net, "wallet": user.wallet}
     return render(request, "layouts/history.html", context=context)
 
 
@@ -730,7 +747,8 @@ def mtn_history(request):
     user_transactions = models.MTNTransaction.objects.filter(user=request.user).order_by('transaction_date').reverse()
     header = "MTN Transactions"
     net = "mtn"
-    context = {'txns': user_transactions, "header": header, "net": net}
+    user = models.CustomUser.objects.get(id=request.user.id)
+    context = {'txns': user_transactions, "header": header, "net": net, "wallet": user.wallet}
     return render(request, "layouts/history.html", context=context)
 
 
@@ -740,7 +758,8 @@ def big_time_history(request):
         'transaction_date').reverse()
     header = "Big Time Transactions"
     net = "bt"
-    context = {'txns': user_transactions, "header": header, "net": net}
+    user = models.CustomUser.objects.get(id=request.user.id)
+    context = {'txns': user_transactions, "header": header, "net": net, "wallet": user.wallet}
     return render(request, "layouts/history.html", context=context)
 
 
@@ -749,7 +768,8 @@ def afa_history(request):
     user_transactions = models.AFARegistration.objects.filter(user=request.user).order_by('transaction_date').reverse()
     header = "AFA Registrations"
     net = "afa"
-    context = {'txns': user_transactions, "header": header, "net": net}
+    user = models.CustomUser.objects.get(id=request.user.id)
+    context = {'txns': user_transactions, "header": header, "net": net, "wallet": user.wallet}
     return render(request, "layouts/afa_history.html", context=context)
 
 
@@ -838,7 +858,7 @@ def at_mark_as_sent(request, pk):
         txn.transaction_status = "Completed"
         txn.save()
         sms_headers = {
-            'Authorization': 'Bearer 1334|wroIm5YnQD6hlZzd8POtLDXxl4vQodCZNorATYGX',
+            'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
             'Content-Type': 'application/json'
         }
 
@@ -847,7 +867,7 @@ def at_mark_as_sent(request, pk):
 
         sms_body = {
             'recipient': f"233{txn.user.phone}",
-            'sender_id': 'GH BAY',
+            'sender_id': 'Data4All',
             'message': sms_message
         }
         try:
@@ -868,7 +888,7 @@ def bt_mark_as_sent(request, pk):
         txn.transaction_status = "Completed"
         txn.save()
         sms_headers = {
-            'Authorization': 'Bearer 1334|wroIm5YnQD6hlZzd8POtLDXxl4vQodCZNorATYGX',
+            'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
             'Content-Type': 'application/json'
         }
 
@@ -877,7 +897,7 @@ def bt_mark_as_sent(request, pk):
 
         sms_body = {
             'recipient': f"233{txn.user.phone}",
-            'sender_id': 'GH BAY',
+            'sender_id': 'Data4All',
             'message': sms_message
         }
         try:
@@ -898,7 +918,7 @@ def afa_mark_as_sent(request, pk):
         txn.transaction_status = "Completed"
         txn.save()
         sms_headers = {
-            'Authorization': 'Bearer 1334|wroIm5YnQD6hlZzd8POtLDXxl4vQodCZNorATYGX',
+            'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
             'Content-Type': 'application/json'
         }
 
@@ -907,7 +927,7 @@ def afa_mark_as_sent(request, pk):
 
         sms_body = {
             'recipient': f"233{txn.user.phone}",
-            'sender_id': 'GH BAY',
+            'sender_id': 'Data4All',
             'message': sms_message
         }
         response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
@@ -916,6 +936,7 @@ def afa_mark_as_sent(request, pk):
         return redirect('afa_admin')
 
 
+@login_required(login_url='login')
 def credit_user(request):
     form = forms.CreditUserForm()
     if request.user.is_superuser:
@@ -1036,11 +1057,12 @@ def topup_info(request):
 @login_required(login_url='login')
 def request_successful(request, reference):
     admin = models.AdminInfo.objects.filter().first()
+    user = models.CustomUser.objects.get(id=request.user.id)
     context = {
         "name": admin.name,
         "number": f"0{admin.momo_number}",
         "channel": admin.payment_channel,
-        "reference": reference
+        "reference": reference, "wallet": user.wallet
     }
     return render(request, "layouts/services/request_successful.html", context=context)
 
