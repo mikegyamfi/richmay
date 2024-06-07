@@ -1469,4 +1469,156 @@ def password_reset_request(request):
                   context={"password_reset_form": password_reset_form})
 
 
+@login_required(login_url='login')
+def voda(request):
+    user = models.CustomUser.objects.get(id=request.user.id)
+    status = user.status
+    form = forms.VodaBundleForm(status)
+    reference = helper.ref_generator()
+    user_email = request.user.email
+    db_user_id = request.user.id
 
+    # if request.method == "POST":
+        # payment_reference = request.POST.get("reference")
+        # amount_paid = request.POST.get("amount")
+        # new_payment = models.Payment.objects.create(
+        #     user=request.user,
+        #     reference=payment_reference,
+        #     amount=amount_paid,
+        #     transaction_date=datetime.now(),
+        #     transaction_status="Pending"
+        # )
+        # new_payment.save()
+        # phone_number = request.POST.get("phone")
+        # offer = request.POST.get("amount")
+        # bundle = models.VodaBundlePrice.objects.get(
+        #     price=float(offer)).bundle_volume if user.status == "User" else models.AgentVodaBundlePrice.objects.get(
+        #     price=float(offer)).bundle_volume
+        #
+        # print(phone_number)
+        # new_mtn_transaction = models.VodafoneTransaction.objects.create(
+        #     user=request.user,
+        #     bundle_number=phone_number,
+        #     offer=f"{bundle}MB",
+        #     reference=payment_reference,
+        # )
+        # new_mtn_transaction.save()
+        # return JsonResponse({'status': "Your transaction will be completed shortly", 'icon': 'success'})
+    user = models.CustomUser.objects.get(id=request.user.id)
+    # phone_num = user.phone
+    # mtn_dict = {}
+    #
+    # if user.status == "Agent":
+    #     mtn_offer = models.AgentMTNBundlePrice.objects.all()
+    # else:
+    #     mtn_offer = models.MTNBundlePrice.objects.all()
+    # for offer in mtn_offer:
+    #     mtn_dict[str(offer)] = offer.bundle_volume
+    context = {'form': form,
+               "ref": reference, "email": user_email, "wallet": 0 if user.wallet is None else user.wallet, 'id': db_user_id}
+    return render(request, "layouts/services/voda.html", context=context)
+
+
+@login_required(login_url='login')
+def voda_pay_with_wallet(request):
+    if request.method == "POST":
+        admin = models.AdminInfo.objects.filter().first().phone_number
+        user = models.CustomUser.objects.get(id=request.user.id)
+        phone_number = request.POST.get("phone")
+        amount = request.POST.get("amount")
+        reference = request.POST.get("reference")
+        print(phone_number)
+        print(amount)
+        print(reference)
+        if user.wallet is None:
+            return JsonResponse(
+                {'status': f'Your wallet balance is low. Contact the admin to recharge.'})
+        elif user.wallet <= 0 or user.wallet < float(amount):
+            return JsonResponse(
+                {'status': f'Your wallet balance is low. Contact the admin to recharge.'})
+
+        if user.status == "User":
+            bundle = models.VodaBundlePrice.objects.get(price=float(amount)).bundle_volume
+        elif user.status == "Agent":
+            bundle = models.AgentVodaBundlePrice.objects.get(price=float(amount)).bundle_volume
+        elif user.status == "Super Agent":
+            bundle = models.SuperAgentVodaBundlePrice.objects.get(price=float(amount)).bundle_volume
+        else:
+            bundle = models.VodaBundlePrice.objects.get(price=float(amount)).bundle_volume
+
+        print(bundle)
+        new_mtn_transaction = models.VodafoneTransaction.objects.create(
+            user=request.user,
+            bundle_number=phone_number,
+            offer=f"{bundle}MB",
+            reference=reference,
+        )
+        new_mtn_transaction.save()
+        user.wallet -= float(amount)
+        user.save()
+
+        sms_message = f"Telecel order has been placed. {bundle}MB for {phone_number}. Reference: {reference}"
+        sms_headers = {
+            'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
+            'Content-Type': 'application/json'
+        }
+
+        sms_url = 'https://webapp.usmsgh.com/api/sms/send'
+
+        sms_body = {
+            'recipient': f"233{user.phone}",
+            'sender_id': 'Data4All',
+            'message': sms_message
+        }
+        # response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
+        # print(response.text)
+        return JsonResponse({'status': "Your transaction will be completed shortly", 'icon': 'success'})
+    return redirect('voda')
+
+
+@login_required(login_url='login')
+def voda_history(request):
+    user_transactions = models.VodafoneTransaction.objects.filter(user=request.user).order_by(
+        'transaction_date').reverse()
+    header = "Vodafone Transactions"
+    net = "voda"
+    context = {'txns': user_transactions, "header": header, "net": net}
+    return render(request, "layouts/history.html", context=context)
+
+
+@login_required(login_url='login')
+def admin_voda_history(request):
+    if request.user.is_staff and request.user.is_superuser:
+        all_txns = models.VodafoneTransaction.objects.filter().order_by('-transaction_date')[:1000]
+        context = {'txns': all_txns}
+        return render(request, "layouts/services/voda_admin.html", context=context)
+
+
+@login_required(login_url='login')
+def voda_mark_as_sent(request, pk):
+    if request.user.is_staff and request.user.is_superuser:
+        txn = models.VodafoneTransaction.objects.filter(id=pk).first()
+        print(txn)
+        txn.transaction_status = "Completed"
+        txn.save()
+
+        sms_url = 'https://webapp.usmsgh.com/api/sms/send'
+        sms_message = f"Your Vodafone transaction has been completed. {txn.bundle_number} has been credited with {txn.offer}.\nTransaction Reference: {txn.reference}"
+
+        sms_headers = {
+            'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
+            'Content-Type': 'application/json'
+        }
+
+        sms_url = 'https://webapp.usmsgh.com/api/sms/send'
+
+        sms_body = {
+            'recipient': f"233{txn.user.phone}",
+            'sender_id': 'Data4All',
+            'message': sms_message
+        }
+        response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
+        print(response.text)
+
+        messages.success(request, f"Transaction Completed")
+        return redirect('voda_admin')

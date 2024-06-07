@@ -49,6 +49,11 @@ class AfaAdmin(ExportActionMixin, admin.ModelAdmin):
     list_display = ['user', 'phone_number', 'gh_card_number', 'name', 'occupation', 'occupation', 'date_of_birth', 'location']
 
 
+class VodafoneTransactionAdmin(admin.ModelAdmin):
+    list_display = ['user', 'bundle_number', 'offer', 'reference', 'transaction_status', 'transaction_date']
+    search_fields = ['reference', 'bundle_number']
+
+
 admin.site.register(models.CustomUser, CustomUserAdmin)
 admin.site.register(models.IShareBundleTransaction, IShareBundleTransactionAdmin)
 admin.site.register(models.MTNTransaction, MTNTransactionAdmin)
@@ -67,3 +72,7 @@ admin.site.register(models.BigTimeBundlePrice)
 admin.site.register(models.AgentBigTimeBundlePrice)
 admin.site.register(models.AFARegistration, AfaAdmin)
 admin.site.register(models.Announcement)
+admin.site.register(models.AgentVodaBundlePrice)
+admin.site.register(models.SuperAgentVodaBundlePrice)
+admin.site.register(models.VodaBundlePrice)
+admin.site.register(models.VodafoneTransaction, VodafoneTransactionAdmin)
