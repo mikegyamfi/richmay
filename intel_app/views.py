@@ -140,7 +140,7 @@ def pay_with_wallet(request):
                     new_transaction.save()
                     return JsonResponse({'status': 'Something went wrong', 'icon': 'error'})
         elif ishare_choice == "Value4Moni":
-            send_bundle_response = helper.send_bundle(request.user, phone_number, bundle, reference)
+            send_bundle_response = helper.value_for_moni_send_bundle(request.user, phone_number, bundle, reference)
             data = send_bundle_response.json()
             print(data)
 
