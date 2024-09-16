@@ -79,63 +79,125 @@ def pay_with_wallet(request):
         elif user.status == "Super Agent":
             bundle = models.SuperAgentIshareBundlePrice.objects.get(price=float(amount)).bundle_volume
         print(bundle)
-        send_bundle_response = helper.send_bundle(request.user, phone_number, bundle, reference)
-        data = send_bundle_response.json()
-        print(data)
+        ishare_choice = models.AdminInfo.objects.filter().first().ishare_source
 
-        sms_headers = {
-            'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
-            'Content-Type': 'application/json'
-        }
+        if ishare_choice == "Gyasi":
+            send_bundle_response = helper.send_bundle(request.user, phone_number, bundle, reference)
+            data = send_bundle_response.json()
+            print(data)
 
-        sms_url = 'https://webapp.usmsgh.com/api/sms/send'
-        if send_bundle_response.status_code == 200:
-            if data["code"] == "0000":
-                new_transaction = models.IShareBundleTransaction.objects.create(
-                    user=request.user,
-                    bundle_number=phone_number,
-                    offer=f"{bundle}MB",
-                    reference=reference,
-                    transaction_status="Completed"
-                )
-                new_transaction.save()
-                user.wallet -= float(amount)
-                user.save()
-                receiver_message = f"Your bundle purchase has been completed successfully. {bundle}MB has been credited to you by {request.user.phone}.\nReference: {reference}\n"
-                sms_message = f"Hello @{request.user.username}. Your bundle purchase has been completed successfully. {bundle}MB has been credited to {phone_number}.\nReference: {reference}\nCurrent Wallet Balance: {user.wallet}\nThank you for using Data4All GH.\n\nThe Data4All GH"
+            sms_headers = {
+                'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
+                'Content-Type': 'application/json'
+            }
 
-                num_without_0 = phone_number[1:]
-                print(num_without_0)
-                receiver_body = {
-                    'recipient': f"233{num_without_0}",
-                    'sender_id': 'Data4All',
-                    'message': receiver_message
-                }
+            sms_url = 'https://webapp.usmsgh.com/api/sms/send'
+            if send_bundle_response.status_code == 200:
+                if data["code"] == "0000":
+                    new_transaction = models.IShareBundleTransaction.objects.create(
+                        user=request.user,
+                        bundle_number=phone_number,
+                        offer=f"{bundle}MB",
+                        reference=reference,
+                        transaction_status="Completed"
+                    )
+                    new_transaction.save()
+                    user.wallet -= float(amount)
+                    user.save()
+                    receiver_message = f"Your bundle purchase has been completed successfully. {bundle}MB has been credited to you by {request.user.phone}.\nReference: {reference}\n"
+                    sms_message = f"Hello @{request.user.username}. Your bundle purchase has been completed successfully. {bundle}MB has been credited to {phone_number}.\nReference: {reference}\nCurrent Wallet Balance: {user.wallet}\nThank you for using Data4All GH.\n\nThe Data4All GH"
 
-                response = requests.request('POST', url=sms_url, params=receiver_body, headers=sms_headers)
-                print(response.text)
+                    num_without_0 = phone_number[1:]
+                    print(num_without_0)
+                    receiver_body = {
+                        'recipient': f"233{num_without_0}",
+                        'sender_id': 'Data4All',
+                        'message': receiver_message
+                    }
 
-                sms_body = {
-                    'recipient': f"233{request.user.phone}",
-                    'sender_id': 'Data4All',
-                    'message': sms_message
-                }
+                    response = requests.request('POST', url=sms_url, params=receiver_body, headers=sms_headers)
+                    print(response.text)
 
-                response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
+                    sms_body = {
+                        'recipient': f"233{request.user.phone}",
+                        'sender_id': 'Data4All',
+                        'message': sms_message
+                    }
 
-                print(response.text)
+                    response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
 
-                return JsonResponse({'status': 'Transaction Completed Successfully', 'icon': 'success'})
-            else:
-                new_transaction = models.IShareBundleTransaction.objects.create(
-                    user=request.user,
-                    bundle_number=phone_number,
-                    offer=f"{bundle}MB",
-                    reference=reference,
-                    transaction_status="Failed"
-                )
-                new_transaction.save()
-                return JsonResponse({'status': 'Something went wrong', 'icon': 'error'})
+                    print(response.text)
+
+                    return JsonResponse({'status': 'Transaction Completed Successfully', 'icon': 'success'})
+                else:
+                    new_transaction = models.IShareBundleTransaction.objects.create(
+                        user=request.user,
+                        bundle_number=phone_number,
+                        offer=f"{bundle}MB",
+                        reference=reference,
+                        transaction_status="Failed"
+                    )
+                    new_transaction.save()
+                    return JsonResponse({'status': 'Something went wrong', 'icon': 'error'})
+        elif ishare_choice == "Value4Moni":
+            send_bundle_response = helper.send_bundle(request.user, phone_number, bundle, reference)
+            data = send_bundle_response.json()
+            print(data)
+
+            sms_headers = {
+                'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
+                'Content-Type': 'application/json'
+            }
+
+            sms_url = 'https://webapp.usmsgh.com/api/sms/send'
+            if send_bundle_response.status_code == 200:
+                if data['code'] == "200":
+                    new_transaction = models.IShareBundleTransaction.objects.create(
+                        user=request.user,
+                        bundle_number=phone_number,
+                        offer=f"{bundle}MB",
+                        reference=reference,
+                        transaction_status="Completed"
+                    )
+                    new_transaction.save()
+                    user.wallet -= float(amount)
+                    user.save()
+                    receiver_message = f"Your bundle purchase has been completed successfully. {bundle}MB has been credited to you by {request.user.phone}.\nReference: {reference}\n"
+                    sms_message = f"Hello @{request.user.username}. Your bundle purchase has been completed successfully. {bundle}MB has been credited to {phone_number}.\nReference: {reference}\nCurrent Wallet Balance: {user.wallet}\nThank you for using Data4All GH.\n\nThe Data4All GH"
+
+                    num_without_0 = phone_number[1:]
+                    print(num_without_0)
+                    receiver_body = {
+                        'recipient': f"233{num_without_0}",
+                        'sender_id': 'Data4All',
+                        'message': receiver_message
+                    }
+
+                    response = requests.request('POST', url=sms_url, params=receiver_body, headers=sms_headers)
+                    print(response.text)
+
+                    sms_body = {
+                        'recipient': f"233{request.user.phone}",
+                        'sender_id': 'Data4All',
+                        'message': sms_message
+                    }
+
+                    response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
+
+                    print(response.text)
+
+                    return JsonResponse({'status': 'Transaction Completed Successfully', 'icon': 'success'})
+                else:
+                    new_transaction = models.IShareBundleTransaction.objects.create(
+                        user=request.user,
+                        bundle_number=phone_number,
+                        offer=f"{bundle}MB",
+                        reference=reference,
+                        transaction_status="Failed"
+                    )
+                    new_transaction.save()
+                    return JsonResponse({'status': 'Something went wrong', 'icon': 'error'})
+
     return redirect('airtel-tigo')
 
 
