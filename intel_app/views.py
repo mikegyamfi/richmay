@@ -1622,7 +1622,7 @@ def voda_pay_with_wallet(request):
             payload = {
                 "API_Key": config("MONI_API_KEY"),
                 "Receiver": str(phone_number),
-                "Volume": str(bundle),
+                "Volume": str(int(bundle)),
                 "Reference": reference,
                 "Package_Type": "Telecel"
             }
@@ -1666,6 +1666,16 @@ def voda_pay_with_wallet(request):
                     transaction_status="Failed"
                 )
                 new_mtn_transaction.save()
+        else:
+            new_mtn_transaction = models.VodafoneTransaction.objects.create(
+                user=request.user,
+                bundle_number=phone_number,
+                offer=f"{bundle}MB",
+                reference=reference,
+            )
+            new_mtn_transaction.save()
+            user.wallet -= float(amount)
+            user.save()
         sms_message = f"Telecel order has been placed. {bundle}MB for {phone_number}. Reference: {reference}"
         sms_headers = {
             'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
