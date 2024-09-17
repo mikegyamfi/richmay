@@ -1609,16 +1609,63 @@ def voda_pay_with_wallet(request):
             bundle = models.VodaBundlePrice.objects.get(price=float(amount)).bundle_volume
 
         print(bundle)
-        new_mtn_transaction = models.VodafoneTransaction.objects.create(
-            user=request.user,
-            bundle_number=phone_number,
-            offer=f"{bundle}MB",
-            reference=reference,
-        )
-        new_mtn_transaction.save()
-        user.wallet -= float(amount)
-        user.save()
 
+        telecel_active = models.AdminInfo.objects.filter().first().telecel_active
+        if telecel_active:
+            url = "https://www.value4moni.com/api/v1/inititate_transaction"
+
+            headers = {
+                'Content-Type': 'application/json',
+            }
+
+            # Create the payload for the POST request
+            payload = {
+                "API_Key": config("MONI_API_KEY"),
+                "Receiver": str(phone_number),
+                "Volume": str(bundle),
+                "Reference": reference,
+                "Package_Type": "Telecel"
+            }
+
+            # Convert the payload into JSON format
+            json_payload = json.dumps(payload)
+
+            # Make the POST request to the API
+            response = requests.post(url, headers=headers, data=json_payload)
+
+            print(response.json())
+
+            data = response.json()
+            if response.status_code == 200:
+                if data['code'] == '200':
+                    new_mtn_transaction = models.VodafoneTransaction.objects.create(
+                        user=request.user,
+                        bundle_number=phone_number,
+                        offer=f"{bundle}MB",
+                        reference=reference,
+                        transaction_status="Completed"
+                    )
+                    new_mtn_transaction.save()
+                    user.wallet -= float(amount)
+                    user.save()
+                else:
+                    new_mtn_transaction = models.VodafoneTransaction.objects.create(
+                        user=request.user,
+                        bundle_number=phone_number,
+                        offer=f"{bundle}MB",
+                        reference=reference,
+                        transaction_status="Failed"
+                    )
+                    new_mtn_transaction.save()
+            else:
+                new_mtn_transaction = models.VodafoneTransaction.objects.create(
+                    user=request.user,
+                    bundle_number=phone_number,
+                    offer=f"{bundle}MB",
+                    reference=reference,
+                    transaction_status="Failed"
+                )
+                new_mtn_transaction.save()
         sms_message = f"Telecel order has been placed. {bundle}MB for {phone_number}. Reference: {reference}"
         sms_headers = {
             'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',

@@ -38,6 +38,7 @@ class AdminInfo(models.Model):
     payment_channel = models.CharField(max_length=250, choices=choices)
     afa_price = models.FloatField(null=True, blank=True)
     mtn_api_status = models.BooleanField(default=True)
+    telecel_active = models.BooleanField(default=True)
     ishare_choices = (
         ("Gyasi", "Gyasi"),
         ("Value4Moni", "Value4Moni"),
