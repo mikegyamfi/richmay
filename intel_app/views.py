@@ -1648,6 +1648,7 @@ def voda_pay_with_wallet(request):
                     new_mtn_transaction.save()
                     user.wallet -= float(amount)
                     user.save()
+                    return JsonResponse({'status': "Transaction Completed Successfully", 'icon': 'success'})
                 else:
                     new_mtn_transaction = models.VodafoneTransaction.objects.create(
                         user=request.user,
@@ -1657,6 +1658,7 @@ def voda_pay_with_wallet(request):
                         transaction_status="Failed"
                     )
                     new_mtn_transaction.save()
+                    return JsonResponse({'status': "Something went wrong", 'icon': 'success'})
             else:
                 new_mtn_transaction = models.VodafoneTransaction.objects.create(
                     user=request.user,
@@ -1666,6 +1668,7 @@ def voda_pay_with_wallet(request):
                     transaction_status="Failed"
                 )
                 new_mtn_transaction.save()
+                return JsonResponse({'status': "Something went wrong", 'icon': 'success'})
         else:
             new_mtn_transaction = models.VodafoneTransaction.objects.create(
                 user=request.user,
@@ -1676,22 +1679,22 @@ def voda_pay_with_wallet(request):
             new_mtn_transaction.save()
             user.wallet -= float(amount)
             user.save()
-        sms_message = f"Telecel order has been placed. {bundle}MB for {phone_number}. Reference: {reference}"
-        sms_headers = {
-            'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
-            'Content-Type': 'application/json'
-        }
+            sms_message = f"Telecel order has been placed. {bundle}MB for {phone_number}. Reference: {reference}"
+            sms_headers = {
+                'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
+                'Content-Type': 'application/json'
+            }
 
-        sms_url = 'https://webapp.usmsgh.com/api/sms/send'
+            sms_url = 'https://webapp.usmsgh.com/api/sms/send'
 
-        sms_body = {
-            'recipient': f"233{user.phone}",
-            'sender_id': 'Data4All',
-            'message': sms_message
-        }
-        # response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
-        # print(response.text)
-        return JsonResponse({'status': "Your transaction will be completed shortly", 'icon': 'success'})
+            sms_body = {
+                'recipient': f"233{user.phone}",
+                'sender_id': 'Data4All',
+                'message': sms_message
+            }
+            # response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
+            # print(response.text)
+            return JsonResponse({'status': "Your transaction will be completed shortly", 'icon': 'success'})
     return redirect('voda')
 
 
