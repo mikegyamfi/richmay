@@ -996,46 +996,46 @@ def afa_mark_as_sent(request, pk):
         return redirect('afa_admin')
 
 
-@login_required(login_url='login')
-def credit_user(request):
-    form = forms.CreditUserForm()
-    if request.user.is_superuser:
-        if request.method == "POST":
-            form = forms.CreditUserForm(request.POST)
-            if form.is_valid():
-                user = form.cleaned_data["user"]
-                amount = form.cleaned_data["amount"]
-                print(user)
-                print(amount)
-                user_needed = models.CustomUser.objects.get(username=user)
-                if user_needed.wallet is None:
-                    user_needed.wallet = float(amount)
-                else:
-                    user_needed.wallet += float(amount)
-                user_needed.save()
-                print(user_needed.username)
-                messages.success(request, "Crediting Successful")
-                sms_headers = {
-                    'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
-                    'Content-Type': 'application/json'
-                }
-
-                sms_url = 'https://webapp.usmsgh.com/api/sms/send'
-                sms_message = f"Hello {user_needed},\nYour DataForAll wallet has been credit with GHS{amount}.\nDataForAll."
-
-                sms_body = {
-                    'recipient': f"233{user_needed.phone}",
-                    'sender_id': 'Data4All',
-                    'message': sms_message
-                }
-                response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
-                print(response.text)
-                return redirect('credit_user')
-        context = {'form': form}
-        return render(request, "layouts/services/credit.html", context=context)
-    else:
-        messages.error(request, "Access Denied")
-        return redirect('home')
+# @login_required(login_url='login')
+# def credit_user(request):
+#     form = forms.CreditUserForm()
+#     if request.user.is_superuser:
+#         if request.method == "POST":
+#             form = forms.CreditUserForm(request.POST)
+#             if form.is_valid():
+#                 user = form.cleaned_data["user"]
+#                 amount = form.cleaned_data["amount"]
+#                 print(user)
+#                 print(amount)
+#                 user_needed = models.CustomUser.objects.get(username=user)
+#                 if user_needed.wallet is None:
+#                     user_needed.wallet = float(amount)
+#                 else:
+#                     user_needed.wallet += float(amount)
+#                 user_needed.save()
+#                 print(user_needed.username)
+#                 messages.success(request, "Crediting Successful")
+#                 sms_headers = {
+#                     'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
+#                     'Content-Type': 'application/json'
+#                 }
+#
+#                 sms_url = 'https://webapp.usmsgh.com/api/sms/send'
+#                 sms_message = f"Hello {user_needed},\nYour DataForAll wallet has been credit with GHS{amount}.\nDataForAll."
+#
+#                 sms_body = {
+#                     'recipient': f"233{user_needed.phone}",
+#                     'sender_id': 'Data4All',
+#                     'message': sms_message
+#                 }
+#                 response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
+#                 print(response.text)
+#                 return redirect('credit_user')
+#         context = {'form': form}
+#         return render(request, "layouts/services/credit.html", context=context)
+#     else:
+#         messages.error(request, "Access Denied")
+#         return redirect('home')
 
 
 @login_required(login_url='login')
