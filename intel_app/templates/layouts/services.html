@@ -129,7 +129,6 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-console.log("saw this")
   document.addEventListener("DOMContentLoaded", function () {
     let announcements = {{ announcements|safe }};
     if (announcements.length > 0) {
@@ -137,9 +136,16 @@ console.log("saw this")
 
       function showAnnouncement() {
         let announcement = announcements[index];
+
+        // Check if the link is valid
+        let linkHTML = "";
+        if (announcement.link && announcement.link.trim() !== "" && announcement.link.toLowerCase() !== "none") {
+          linkHTML = `<br><a href="${announcement.link}" target="_blank">${announcement.link}</a>`;
+        }
+
         Swal.fire({
           title: announcement.title || "Announcement",
-          html: `<p>${announcement.message}</p><a href="${announcement.link}" target="_blank">${announcement.link}</a>`,
+          html: `<p>${announcement.message}</p>${linkHTML}`,
           icon: "info",
           confirmButtonText: index < announcements.length - 1 ? "Next" : "Close",
         }).then(() => {
