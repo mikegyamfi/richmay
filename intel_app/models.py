@@ -30,6 +30,9 @@ class AdminInfo(models.Model):
     phone_number = models.BigIntegerField(null=True, blank=True)
     momo_number = models.PositiveBigIntegerField(null=True, blank=True)
     email = models.EmailField(null=True, blank=True)
+    mtn_active = models.BooleanField(default=False)
+    at_active = models.BooleanField(default=False)
+    telecel_service_active = models.BooleanField(default=False)
     choices = (
         ("MTN Mobile Money", "MTN Mobile Money"),
         ("Vodafone Cash", "Vodafone Cash"),
@@ -42,6 +45,7 @@ class AdminInfo(models.Model):
     ishare_choices = (
         ("Gyasi", "Gyasi"),
         ("Value4Moni", "Value4Moni"),
+        ("Geosams", "Geosams")
     )
     ishare_source = models.CharField(max_length=250, null=True, blank=True, choices=ishare_choices, default="Value4Moni")
 
@@ -240,7 +244,9 @@ class TopUpRequest(models.Model):
 
 
 class Announcement(models.Model):
+    title = models.CharField(max_length=200, null=True, blank=True)
     message = models.CharField(max_length=500, null=True, blank=True)
+    link = models.URLField(null=True, blank=True)
     active = models.BooleanField(default=True)
 
     def __str__(self):

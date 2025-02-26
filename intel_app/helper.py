@@ -101,6 +101,25 @@ def value_for_moni_send_bundle(user, receiver, bundle_amount, reference):
     return response
 
 
+def controller_send_bundle(receiver, bundle_amount, reference):
+    url = "https://testhub.geosams.com/controller/api/send_bundle/"
+
+    payload = json.dumps({
+        "phone_number": str(receiver),
+        "amount": int(bundle_amount),
+        "reference": str(reference),
+        "network": "AT"
+    })
+    headers = {
+        'Authorization': config("CONTROLLER_TOKEN"),
+        'Content-Type': 'application/json'
+    }
+
+    response = requests.request("POST", url, headers=headers, data=payload)
+    print(response.text)
+    return response
+
+
 def verify_paystack_transaction(reference):
     url = f"https://api.paystack.co/transaction/verify/{reference}"
 

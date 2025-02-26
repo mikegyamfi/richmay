@@ -26,7 +26,7 @@ SECRET_KEY = config("SECRET_KEY")
 # SECRET_KEY = "DGFYUGEUGFEFE"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = [
     'www.dataforall.store',
@@ -48,7 +48,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'intel_app',
-    'django_select2',
 ]
 
 # CACHES = {
