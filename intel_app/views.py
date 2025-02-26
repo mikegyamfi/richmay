@@ -32,14 +32,13 @@ def home(request):
 
 
 def services(request):
-    if models.Announcement.objects.filter(active=True).exists():
-        announcement = models.Announcement.objects.filter(active=True).first()
-        messages.info(request, announcement.message)
+    announcements = models.Announcement.objects.filter(active=True).values("title", "message", "link")
+    context = {"announcements": list(announcements)}
+
     if request.user.is_authenticated:
         user = models.CustomUser.objects.get(id=request.user.id)
-        context = {'wallet': user.wallet}
-        return render(request, "layouts/services.html", context=context)
-    return render(request, "layouts/services.html")
+        context["wallet"] = user.wallet
+    return render(request, "layouts/services.html", context)
 
 
 @login_required(login_url='login')
