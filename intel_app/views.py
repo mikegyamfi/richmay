@@ -22,7 +22,19 @@ from .models import CustomUser
 # Create your views here.
 def home(request):
     announcements = models.Announcement.objects.filter(active=True).values("title", "message", "link")
-    context = {"announcements": list(announcements)}
+
+    # Process announcements to remove 'link' if it's empty or None
+    processed_announcements = []
+    for announcement in announcements:
+        if not announcement["link"] or announcement["link"].strip().lower() == "none":
+            del announcement["link"]  # Remove the link field if empty or None
+        processed_announcements.append(announcement)
+
+    context = {"announcements": processed_announcements}
+
+    if request.user.is_authenticated:
+        user = models.CustomUser.objects.get(id=request.user.id)
+        context["wallet"] = user.wallet
 
     if request.user.is_authenticated:
         user = models.CustomUser.objects.get(id=request.user.id)
@@ -34,7 +46,15 @@ def home(request):
 
 def services(request):
     announcements = models.Announcement.objects.filter(active=True).values("title", "message", "link")
-    context = {"announcements": list(announcements)}
+
+    # Process announcements to remove 'link' if it's empty or None
+    processed_announcements = []
+    for announcement in announcements:
+        if not announcement["link"] or announcement["link"].strip().lower() == "none":
+            del announcement["link"]  # Remove the link field if empty or None
+        processed_announcements.append(announcement)
+
+    context = {"announcements": processed_announcements}
 
     if request.user.is_authenticated:
         user = models.CustomUser.objects.get(id=request.user.id)
