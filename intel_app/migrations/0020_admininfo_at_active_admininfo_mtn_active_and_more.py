@@ -22,11 +22,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='admininfo',
-            name='telecel_active',
-            field=models.BooleanField(default=True),
-        ),
-        migrations.AddField(
-            model_name='admininfo',
             name='telecel_service_active',
             field=models.BooleanField(default=False),
         ),

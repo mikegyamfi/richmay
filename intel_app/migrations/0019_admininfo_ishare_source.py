@@ -15,4 +15,9 @@ class Migration(migrations.Migration):
             name='ishare_source',
             field=models.CharField(blank=True, choices=[('Gyasi', 'Gyasi'), ('Value4Moni', 'Value4Moni')], default='Value4Moni', max_length=250, null=True),
         ),
+        migrations.AddField(
+            model_name='admininfo',
+            name='telecel_active',
+            field=models.BooleanField(default=True),
+        ),
     ]
