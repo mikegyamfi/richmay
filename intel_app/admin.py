@@ -19,6 +19,8 @@ class CustomUserAdminForm(forms.ModelForm):
 
 # Register your models here.
 class CustomUserAdmin(ExportActionMixin, UserAdmin):
+    form = CustomUserAdminForm
+    model = CustomUser
     list_display = ['first_name', 'last_name', 'username', 'email', 'wallet', 'phone', 'status']
 
     fieldsets = (
