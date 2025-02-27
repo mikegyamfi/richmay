@@ -4,10 +4,13 @@ from datetime import datetime
 import pandas as pd
 from decouple import config
 from django.contrib.auth.forms import PasswordResetForm
-from django.shortcuts import render, redirect
+from django.db import transaction
+from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseRedirect
 import requests
 from django.template.loader import render_to_string
+from django.urls import reverse
+from django.utils import timezone
 from django.utils.http import urlsafe_base64_encode
 from django.views.decorators.csrf import csrf_exempt
 
@@ -45,25 +48,12 @@ def home(request):
 
 
 def services(request):
-    announcements = models.Announcement.objects.filter(active=True).values("title", "message", "link")
-
-    # Process announcements to remove 'link' if it's empty or None
-    processed_announcements = []
-    for announcement in announcements:
-        if not announcement["link"] or announcement["link"].strip().lower() == "none":
-            del announcement["link"]  # Remove the link field if empty or None
-        processed_announcements.append(announcement)
-
-    context = {"announcements": processed_announcements}
-
-    if request.user.is_authenticated:
-        user = models.CustomUser.objects.get(id=request.user.id)
-        context["wallet"] = user.wallet
-
-    print(context)
+    user = models.CustomUser.objects.get(id=request.user.id)
+    context = {"wallet": user.wallet}
     return render(request, "layouts/services.html", context)
 
 
+@transaction.atomic
 @login_required(login_url='login')
 def pay_with_wallet(request):
     if request.method == "POST":
@@ -126,6 +116,14 @@ def pay_with_wallet(request):
                     new_transaction.save()
                     user.wallet -= float(amount)
                     user.save()
+
+                    models.WalletTransaction.objects.create(
+                        user=user,
+                        transaction_type='Debit',
+                        transaction_amount=amount,
+                        transaction_use='AT Bundle Purchase',
+                        new_balance=user.wallet,
+                    )
                     receiver_message = f"Your bundle purchase has been completed successfully. {bundle}MB has been credited to you by {request.user.phone}.\nReference: {reference}\n"
                     sms_message = f"Hello @{request.user.username}. Your bundle purchase has been completed successfully. {bundle}MB has been credited to {phone_number}.\nReference: {reference}\nCurrent Wallet Balance: {user.wallet}\nThank you for using Data4All GH.\n\nThe Data4All GH"
 
@@ -184,6 +182,14 @@ def pay_with_wallet(request):
                     new_transaction.save()
                     user.wallet -= float(amount)
                     user.save()
+
+                    models.WalletTransaction.objects.create(
+                        user=user,
+                        transaction_type='Debit',
+                        transaction_amount=amount,
+                        transaction_use='AT Bundle Purchase',
+                        new_balance=user.wallet,
+                    )
                     receiver_message = f"Your bundle purchase has been completed successfully. {bundle}MB has been credited to you by {request.user.phone}.\nReference: {reference}\n"
                     sms_message = f"Hello @{request.user.username}. Your bundle purchase has been completed successfully. {bundle}MB has been credited to {phone_number}.\nReference: {reference}\nCurrent Wallet Balance: {user.wallet}\nThank you for using Data4All GH.\n\nThe Data4All GH"
 
@@ -245,6 +251,14 @@ def pay_with_wallet(request):
                     new_transaction.save()
                     user.wallet -= float(amount)
                     user.save()
+
+                    models.WalletTransaction.objects.create(
+                        user=user,
+                        transaction_type='Debit',
+                        transaction_amount=amount,
+                        transaction_use='AT Bundle Purchase',
+                        new_balance=user.wallet,
+                    )
                     receiver_message = f"Your bundle purchase has been completed successfully. {bundle}MB has been credited to you by {request.user.phone}.\nReference: {reference}\n"
                     sms_message = f"Hello @{request.user.username}. Your bundle purchase has been completed successfully. {bundle}MB has been credited to {phone_number}.\nReference: {reference}\nCurrent Wallet Balance: {user.wallet}\nThank you for using Data4All GH.\n\nThe Data4All GH"
 
@@ -280,6 +294,26 @@ def pay_with_wallet(request):
                     )
                     new_transaction.save()
                     return JsonResponse({'status': 'Something went wrong', 'icon': 'error'})
+        else:
+            new_transaction = models.IShareBundleTransaction.objects.create(
+                user=request.user,
+                bundle_number=phone_number,
+                offer=f"{bundle}MB",
+                reference=reference,
+                transaction_status="Pending"
+            )
+            new_transaction.save()
+            user.wallet -= float(amount)
+            user.save()
+
+            models.WalletTransaction.objects.create(
+                user=user,
+                transaction_type='Debit',
+                transaction_amount=amount,
+                transaction_use='AT Bundle Purchase',
+                new_balance=user.wallet,
+            )
+            messages.info(request, "You transaction will be completed soon")
     return redirect('airtel-tigo')
 
 
@@ -421,10 +455,12 @@ def airtel_tigo(request):
         context = {"form": form, "ref": reference, "email": user_email, "wallet": 0 if user.wallet is None else user.wallet}
         return render(request, "layouts/services/at.html", context=context)
     else:
-        messages.info(request, "Service is not active")
-        return redirect('home')
+        messages.info(request, "Ishare Service is not active. Try again later")
+        home_url = request.build_absolute_uri(reverse('services'))  # Build absolute URL using named pattern
+        return redirect(home_url)
 
 
+@transaction.atomic
 @login_required(login_url='login')
 def mtn_pay_with_wallet(request):
     if request.method == "POST":
@@ -470,8 +506,8 @@ def mtn_pay_with_wallet(request):
         elif user.status == "Super Agent":
             bundle = models.SuperAgentMTNBundlePrice.objects.get(price=float(amount)).bundle_volume
         print(bundle)
-        auth = config("AT")
-        user_id = config("USER_ID")
+        auth = 'config("AT")'
+        user_id = 'config("USER_ID")'
         print(api_status)
 
         if api_status is True:
@@ -499,9 +535,18 @@ def mtn_pay_with_wallet(request):
                 user=request.user,
                 bundle_number=phone_number,
                 offer=f"{bundle}MB",
+                amount=amount,
                 reference=reference,
             )
             new_mtn_transaction.save()
+
+            models.WalletTransaction.objects.create(
+                user=user,
+                transaction_type='Debit',
+                transaction_amount=amount,
+                transaction_use='MTN Bundle Purchase',
+                new_balance=user.wallet,
+            )
             return JsonResponse({'status': "Your transaction will be completed shortly", 'icon': 'success'})
         else:
             print("used else")
@@ -515,6 +560,14 @@ def mtn_pay_with_wallet(request):
             new_mtn_transaction.save()
             user.wallet -= float(amount)
             user.save()
+
+            models.WalletTransaction.objects.create(
+                user=user,
+                transaction_type='Debit',
+                transaction_amount=amount,
+                transaction_use='MTN Bundle Purchase',
+                new_balance=user.wallet,
+            )
             sms_body = {
                 'recipient': "233540975553",
                 'sender_id': 'Data4All',
@@ -585,8 +638,8 @@ def mtn(request):
         form = forms.MTNForm(status=status)
         reference = helper.ref_generator()
         user_email = request.user.email
-        auth = config("AT")
-        user_id = config("USER_ID")
+        auth = '"config("AT")"'
+        user_id = 'config("USER_ID")'
         if request.method == "POST":
             form = forms.MTNForm(data=request.POST, status=status)
             if form.is_valid():
@@ -699,8 +752,9 @@ def mtn(request):
                    "ref": reference, "email": user_email, "wallet": 0 if user.wallet is None else user.wallet}
         return render(request, "layouts/services/mtn.html", context=context)
     else:
-        messages.info(request, "The MTN service is not active")
-        return redirect('home')
+        messages.info(request, "MTN Service is not active. Try again later")
+        home_url = request.build_absolute_uri(reverse('services'))  # Build absolute URL using named pattern
+        return redirect(home_url)
 
 
 @login_required(login_url='login')
@@ -765,6 +819,7 @@ def afa_registration(request):
     return render(request, "layouts/services/afa.html", context=context)
 
 
+@transaction.atomic
 @login_required(login_url='login')
 def afa_registration_wallet(request):
     if request.method == "POST":
@@ -813,6 +868,14 @@ def afa_registration_wallet(request):
         new_registration.save()
         user.wallet -= float(price)
         user.save()
+
+        models.WalletTransaction.objects.create(
+            user=user,
+            transaction_type='Credit',
+            transaction_amount=amount,
+            transaction_use='Admin Credit',
+            new_balance=user.wallet,
+        )
         return JsonResponse({'status': "Your transaction will be completed shortly", 'icon': 'success'})
     return redirect('home')
 
@@ -1231,44 +1294,67 @@ def topup_list(request):
         return redirect('home')
 
 
+@transaction.atomic
 @login_required(login_url='login')
 def credit_user_from_list(request, reference):
-    if request.user.is_superuser:
-        crediting = models.TopUpRequest.objects.filter(reference=reference).first()
-        user = crediting.user
-        custom_user = models.CustomUser.objects.get(username=user.username)
-        if crediting.status:
-            return redirect('topup_list')
-        amount = crediting.amount
-        print(user)
-        print(user.phone)
-        print(amount)
-        custom_user.wallet += amount
-        custom_user.save()
-        crediting.status = True
-        crediting.credited_at = datetime.now()
-        crediting.save()
-        sms_headers = {
-            'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
-            'Content-Type': 'application/json'
-        }
-
-        sms_url = 'https://webapp.usmsgh.com/api/sms/send'
-        sms_message = f"Hello,\nYour wallet has been topped up with GHS{amount}.\nReference: {reference}.\nThank you"
-
-        sms_body = {
-            'recipient': f"233{custom_user.phone}",
-            'sender_id': 'Data4All',
-            'message': sms_message
-        }
-        try:
-            response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
-            print(response.text)
-        except:
-            print("message not sent")
-            pass
-        messages.success(request, f"{user} has been credited with {amount}")
+    # Only superusers can credit a user
+    if not request.user.is_superuser:
+        messages.error(request, "You do not have permission to perform this action.")
         return redirect('topup_list')
+
+    # Retrieve the top-up request; 404 if not found
+    crediting = get_object_or_404(models.TopUpRequest, reference=reference)
+
+    # If already credited, inform the user and redirect
+    if crediting.status:
+        messages.info(request, "This top-up request has already been credited.")
+        return redirect('topup_list')
+
+    # Get the user associated with the top-up request
+    custom_user = crediting.user  # Assuming this is an instance of CustomUser
+    amount = crediting.amount
+
+    # Update the user's wallet balance
+    custom_user.wallet += amount
+    custom_user.save()
+
+    # Mark the top-up request as credited and set the credited time
+    crediting.status = True
+    crediting.credited_at = timezone.now()
+    crediting.save()
+
+    # Prepare SMS details
+    sms_headers = {
+        'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
+        # Replace with your actual token if needed
+        'Content-Type': 'application/json'
+    }
+    sms_url = 'https://webapp.usmsgh.com/api/sms/send'
+    sms_message = f"Hello,\nYour wallet has been topped up with GHS {amount}.\nReference: {reference}.\nThank you"
+    sms_body = {
+        'recipient': f"233{custom_user.phone}",
+        'sender_id': 'Data4All',
+        'message': sms_message
+    }
+
+    # Send SMS notification with a timeout and log errors if they occur
+    try:
+        response = requests.post(sms_url, json=sms_body, headers=sms_headers, timeout=10)
+        print(response.text)
+    except Exception as e:
+        print(e)
+
+    # Log the wallet transaction
+    models.WalletTransaction.objects.create(
+        user=custom_user,
+        transaction_type='Credit',
+        transaction_amount=amount,
+        transaction_use='Admin Credit',
+        new_balance=custom_user.wallet,
+    )
+
+    messages.success(request, f"{custom_user} has been credited with GHS {amount}.")
+    return redirect('topup_list')
 
 
 @csrf_exempt
@@ -1674,10 +1760,12 @@ def voda(request):
                    "ref": reference, "email": user_email, "wallet": 0 if user.wallet is None else user.wallet, 'id': db_user_id}
         return render(request, "layouts/services/voda.html", context=context)
     else:
-        messages.info(request, "The Telecel service is not active")
-        return redirect('home')
+        messages.info(request, "Telecel Service is not active. Try again later")
+        home_url = request.build_absolute_uri(reverse('services'))  # Build absolute URL using named pattern
+        return redirect(home_url)
 
 
+@transaction.atomic
 @login_required(login_url='login')
 def voda_pay_with_wallet(request):
     if request.method == "POST":
@@ -1745,6 +1833,14 @@ def voda_pay_with_wallet(request):
                     new_mtn_transaction.save()
                     user.wallet -= float(amount)
                     user.save()
+
+                    models.WalletTransaction.objects.create(
+                        user=user,
+                        transaction_type='Debit',
+                        transaction_amount=amount,
+                        transaction_use='Telecel Bundle Purchase',
+                        new_balance=user.wallet,
+                    )
                     return JsonResponse({'status': "Transaction Completed Successfully", 'icon': 'success'})
                 else:
                     new_mtn_transaction = models.VodafoneTransaction.objects.create(
@@ -1776,6 +1872,14 @@ def voda_pay_with_wallet(request):
             new_mtn_transaction.save()
             user.wallet -= float(amount)
             user.save()
+
+            models.WalletTransaction.objects.create(
+                user=user,
+                transaction_type='Debit',
+                transaction_amount=amount,
+                transaction_use='Telecel Bundle Purchase',
+                new_balance=user.wallet,
+            )
             sms_message = f"Telecel order has been placed. {bundle}MB for {phone_number}. Reference: {reference}"
             sms_headers = {
                 'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
@@ -1841,3 +1945,38 @@ def voda_mark_as_sent(request, pk):
 
         messages.success(request, f"Transaction Completed")
         return redirect('voda_admin')
+
+
+@login_required
+def wallet_transactions(request):
+    user = request.user
+    transactions = models.WalletTransaction.objects.filter(user=user).order_by('-transaction_date')[:300]
+    print(transactions)
+    wallet_balance = user.wallet
+    context = {
+        'transactions': transactions,
+        'wallet_balance': wallet_balance,
+    }
+    return render(request, 'layouts/services/wallet_transactions.html', context)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

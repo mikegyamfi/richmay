@@ -54,6 +54,7 @@ class IShareBundleTransaction(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     bundle_number = models.BigIntegerField(null=False, blank=False)
     offer = models.CharField(max_length=250, null=False, blank=False)
+    amount = models.FloatField(null=False, blank=False, default=0.0)
     reference = models.CharField(max_length=20, null=False, blank=True)
     transaction_date = models.DateTimeField(auto_now_add=True)
     transaction_status = models.CharField(max_length=100, null=False)
@@ -127,6 +128,7 @@ class BigTimeTransaction(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     bundle_number = models.BigIntegerField(null=False, blank=False)
     offer = models.CharField(max_length=250, null=False, blank=False)
+    amount = models.FloatField(null=False, blank=False, default=0.0)
     reference = models.CharField(max_length=20, null=False, blank=True)
     transaction_date = models.DateTimeField(auto_now_add=True)
     choices = (
@@ -176,6 +178,7 @@ class MTNTransaction(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     bundle_number = models.BigIntegerField(null=False, blank=False)
     offer = models.CharField(max_length=250, null=False, blank=False)
+    amount = models.FloatField(null=False, blank=False, default=0.0)
     reference = models.CharField(max_length=20, null=False, blank=True)
     transaction_date = models.DateTimeField(auto_now_add=True)
     choices = (
@@ -290,6 +293,7 @@ class VodafoneTransaction(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     bundle_number = models.BigIntegerField(null=False, blank=False)
     offer = models.CharField(max_length=250, null=False, blank=False)
+    amount = models.FloatField(null=False, blank=False, default=0.0)
     reference = models.CharField(max_length=20, null=False, blank=True)
     transaction_date = models.DateTimeField(auto_now_add=True)
     choices = (
@@ -304,5 +308,20 @@ class VodafoneTransaction(models.Model):
     def __str__(self):
         return f"{self.user.username} - {self.bundle_number} - {self.reference}"
 
+
+class WalletTransaction(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    choices = [
+        ("Credit", "Credit"),
+        ("Debit", "Debit")
+    ]
+    transaction_type = models.CharField(max_length=250, null=False, blank=False, choices=choices)
+    transaction_amount = models.FloatField(null=False, blank=False)
+    transaction_use = models.CharField(max_length=250, null=False, blank=False)
+    new_balance = models.FloatField(null=False, blank=False)
+    transaction_date = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.transaction_type} - {self.transaction_amount}"
 
 

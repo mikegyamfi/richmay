@@ -48,6 +48,7 @@
           <button href="#" class="btn btn-outline rounded-pill dropdown-toggle" data-toggle="dropdown" aria-expanded="false">{{request.user}}</button>
             <div class="dropdown-menu">
                 <a class="dropdown-item" href="{% url 'logout' %}">Log out</a>
+                <a class="dropdown-item" href="{% url 'wallet_transactions' %}">Wallet Transactions</a>
                 <a class="dropdown-item" href="{% url 'history' %}">Dashboard</a>
                {% if request.user.is_superuser %}
                 <a class="dropdown-item" href="{% url 'mtn_admin' %}">MTN Admin</a>
