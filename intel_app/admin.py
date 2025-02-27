@@ -22,6 +22,7 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     form = CustomUserAdminForm
     model = CustomUser
     list_display = ['first_name', 'last_name', 'username', 'email', 'wallet', 'phone', 'status']
+    search_fields = ['user__username']
 
     fieldsets = (
         *UserAdmin.fieldsets,
