@@ -54,6 +54,11 @@ class VodafoneTransactionAdmin(admin.ModelAdmin):
     search_fields = ['reference', 'bundle_number']
 
 
+class WalletTransactionAdmin(admin.ModelAdmin):
+    list_display = ['user', 'transaction_type', 'transaction_amount', 'transaction_use', 'new_balance']
+    list_filter = ['user', 'transaction_type', 'transaction_use']
+
+
 admin.site.register(models.CustomUser, CustomUserAdmin)
 admin.site.register(models.IShareBundleTransaction, IShareBundleTransactionAdmin)
 admin.site.register(models.MTNTransaction, MTNTransactionAdmin)
@@ -76,3 +81,8 @@ admin.site.register(models.AgentVodaBundlePrice)
 admin.site.register(models.SuperAgentVodaBundlePrice)
 admin.site.register(models.VodaBundlePrice)
 admin.site.register(models.VodafoneTransaction, VodafoneTransactionAdmin)
+admin.site.register(models.WalletTransaction, WalletTransactionAdmin)
+
+
+
+
