@@ -55,7 +55,7 @@ class VodafoneTransactionAdmin(admin.ModelAdmin):
 
 
 class WalletTransactionAdmin(admin.ModelAdmin):
-    list_display = ['user', 'transaction_type', 'transaction_amount', 'transaction_use', 'new_balance']
+    list_display = ['user', 'transaction_type', 'transaction_amount', 'transaction_use', 'new_balance', 'transaction_date']
     list_filter = ['user', 'transaction_type', 'transaction_use']
 
 
