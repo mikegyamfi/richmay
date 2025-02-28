@@ -30,7 +30,7 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
             'Other Personal info',
             {
                 'fields': (
-                    'phone', 'wallet', 'status', 'add_balance'
+                    'phone', 'add_balance', 'status', 'wallet'
                 )
             }
         )
