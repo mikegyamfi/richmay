@@ -456,7 +456,7 @@ def airtel_tigo(request):
         return render(request, "layouts/services/at.html", context=context)
     else:
         messages.info(request, "Ishare Service is not active. Try again later")
-        return reverse('home')
+        return redirect('services')
 
 
 @transaction.atomic
@@ -752,7 +752,7 @@ def mtn(request):
         return render(request, "layouts/services/mtn.html", context=context)
     else:
         messages.info(request, "MTN Service is not active. Try again later")
-        return reverse('home')
+        return redirect('services')
 
 
 @login_required(login_url='login')
@@ -1759,7 +1759,7 @@ def voda(request):
         return render(request, "layouts/services/voda.html", context=context)
     else:
         messages.info(request, "Telecel Service is not active. Try again later")
-        return reverse('home')
+        return redirect('services')
 
 
 @transaction.atomic
