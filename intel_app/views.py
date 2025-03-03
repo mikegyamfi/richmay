@@ -1972,6 +1972,7 @@ def wallet_transactions(request):
     return render(request, 'layouts/services/wallet_transactions.html', context)
 
 
+@login_required(login_url='login')
 def top_customers_report(request):
     if request.user.is_superuser:
         start_date = request.GET.get('start_date')
