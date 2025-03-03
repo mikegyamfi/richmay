@@ -26,6 +26,7 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
 
     fieldsets = (
         *UserAdmin.fieldsets,
+        (None, {'fields': ('email', 'username', 'password', 'phone')}),
         (
             'Other Personal info',
             {
