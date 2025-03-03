@@ -1,0 +1,264 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  {% include 'inc/header.html' %}
+
+  <div class="container mt-5 pt-5">
+    <h4 class="text-center mb-4">Top Customers Report (Top 10)</h4>
+    <!-- Date range filter form -->
+    <form method="get" class="mb-5">
+      <div class="row justify-content-center">
+        <div class="col-md-3">
+          <label for="start_date">Start Date</label>
+          <input type="date" name="start_date" id="start_date" class="form-control" value="{{ start_date }}">
+        </div>
+        <div class="col-md-3">
+          <label for="end_date">End Date</label>
+          <input type="date" name="end_date" id="end_date" class="form-control" value="{{ end_date }}">
+        </div>
+        <div class="col-md-3 align-self-end">
+          <button type="submit" class="btn btn-primary">Filter</button>
+        </div>
+      </div>
+    </form>
+
+    <!-- Report Cards for each transaction type -->
+    <div class="row">
+      <!-- MTN Transactions Card -->
+      <div class="col-md-4 mb-4">
+        <div class="card h-100">
+          <div class="card-header text-center">
+            <h5>MTN Transactions (Top 10)</h5>
+          </div>
+          <div class="card-body">
+            {% if mtn_top %}
+              <table class="table table-bordered table-sm">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Phone</th>
+                    <th>Total (MB)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in mtn_top %}
+                    <tr>
+                      <td>{{ item.user__username }}</td>
+                      <td>{{ item.user__phone|default:"N/A" }}</td>
+                      <td>{{ item.total_bundle }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            {% else %}
+              <p class="text-center">No MTN transactions found for this period.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Vodafone Transactions Card -->
+      <div class="col-md-4 mb-4">
+        <div class="card h-100">
+          <div class="card-header text-center">
+            <h5>Vodafone Transactions (Top 10)</h5>
+          </div>
+          <div class="card-body">
+            {% if voda_top %}
+              <table class="table table-bordered table-sm">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Phone</th>
+                    <th>Total (MB)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in voda_top %}
+                    <tr>
+                      <td>{{ item.user__username }}</td>
+                      <td>{{ item.user__phone|default:"N/A" }}</td>
+                      <td>{{ item.total_bundle }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            {% else %}
+              <p class="text-center">No Vodafone transactions found for this period.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- IShare Transactions Card -->
+      <div class="col-md-4 mb-4">
+        <div class="card h-100">
+          <div class="card-header text-center">
+            <h5>IShare Transactions (Top 10)</h5>
+          </div>
+          <div class="card-body">
+            {% if ishare_top %}
+              <table class="table table-bordered table-sm">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Phone</th>
+                    <th>Total (MB)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in ishare_top %}
+                    <tr>
+                      <td>{{ item.user__username }}</td>
+                      <td>{{ item.user__phone|default:"N/A" }}</td>
+                      <td>{{ item.total_bundle }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            {% else %}
+              <p class="text-center">No IShare transactions found for this period.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Graphs Section -->
+    <div class="container mt-5">
+      <h4 class="text-center mb-2">Transactions Bar Charts by User (Top 10)</h4>
+      <div class="row">
+        <div class="col-md-4">
+          <h5 class="text-center">MTN Transactions</h5>
+          <canvas id="mtnChart"></canvas>
+        </div>
+        <div class="col-md-4">
+          <h5 class="text-center">Vodafone Transactions</h5>
+          <canvas id="vodaChart"></canvas>
+        </div>
+        <div class="col-md-4">
+          <h5 class="text-center">IShare Transactions</h5>
+          <canvas id="ishareChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% include 'inc/footer.html' %}
+{% endblock %}
+
+{% block scripts %}
+  <!-- Include SweetAlert if needed -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <!-- Include Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      // Parse JSON data passed from view
+      const mtnLabels = JSON.parse('{{ mtn_user_labels|escapejs }}');
+      const mtnTotals = JSON.parse('{{ mtn_user_totals|escapejs }}');
+      const mtnTooltips = JSON.parse('{{ mtn_user_tooltips|escapejs }}');
+
+      const vodaLabels = JSON.parse('{{ voda_user_labels|escapejs }}');
+      const vodaTotals = JSON.parse('{{ voda_user_totals|escapejs }}');
+      const vodaTooltips = JSON.parse('{{ voda_user_tooltips|escapejs }}');
+
+      const ishareLabels = JSON.parse('{{ ishare_user_labels|escapejs }}');
+      const ishareTotals = JSON.parse('{{ ishare_user_totals|escapejs }}');
+      const ishareTooltips = JSON.parse('{{ ishare_user_tooltips|escapejs }}');
+
+      // MTN Bar Chart
+      const ctxMtn = document.getElementById('mtnChart').getContext('2d');
+      new Chart(ctxMtn, {
+          type: 'bar',
+          data: {
+              labels: mtnLabels,
+              datasets: [{
+                  label: 'MTN Bundle Amount',
+                  data: mtnTotals,
+                  backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                  borderColor: 'rgba(75, 192, 192, 1)',
+                  borderWidth: 1
+              }]
+          },
+          options: {
+              plugins: {
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      return mtnTooltips[context.dataIndex] + ' - Total: ' + context.parsed.y;
+                    }
+                  }
+                }
+              },
+              scales: {
+                  x: { title: { display: true, text: 'User' } },
+                  y: { title: { display: true, text: 'Total Bundle Amount (MB)' } }
+              }
+          }
+      });
+
+      // Vodafone Bar Chart
+      const ctxVoda = document.getElementById('vodaChart').getContext('2d');
+      new Chart(ctxVoda, {
+          type: 'bar',
+          data: {
+              labels: vodaLabels,
+              datasets: [{
+                  label: 'Vodafone Bundle Amount',
+                  data: vodaTotals,
+                  backgroundColor: 'rgba(153, 102, 255, 0.5)',
+                  borderColor: 'rgba(153, 102, 255, 1)',
+                  borderWidth: 1
+              }]
+          },
+          options: {
+              plugins: {
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      return vodaTooltips[context.dataIndex] + ' - Total: ' + context.parsed.y;
+                    }
+                  }
+                }
+              },
+              scales: {
+                  x: { title: { display: true, text: 'User' } },
+                  y: { title: { display: true, text: 'Total Bundle Amount (MB)' } }
+              }
+          }
+      });
+
+      // IShare Bar Chart
+      const ctxIshare = document.getElementById('ishareChart').getContext('2d');
+      new Chart(ctxIshare, {
+          type: 'bar',
+          data: {
+              labels: ishareLabels,
+              datasets: [{
+                  label: 'IShare Bundle Amount',
+                  data: ishareTotals,
+                  backgroundColor: 'rgba(255, 159, 64, 0.5)',
+                  borderColor: 'rgba(255, 159, 64, 1)',
+                  borderWidth: 1
+              }]
+          },
+          options: {
+              plugins: {
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      return ishareTooltips[context.dataIndex] + ' - Total: ' + context.parsed.y;
+                    }
+                  }
+                }
+              },
+              scales: {
+                  x: { title: { display: true, text: 'User' } },
+                  y: { title: { display: true, text: 'Total Bundle Amount (MB)' } }
+              }
+          }
+      });
+    });
+  </script>
+{% endblock scripts %}

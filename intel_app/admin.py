@@ -25,16 +25,12 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     search_fields = ['username']
 
     fieldsets = (
-        *UserAdmin.fieldsets,
-        (None, {'fields': ('email', 'username', 'password', 'phone')}),
-        (
-            'Other Personal info',
-            {
-                'fields': (
-                    'add_balance', 'status', 'wallet'
-                )
-            }
-        )
+        (None, {'fields': ('username', 'password', 'phone')}),
+        ('Personal Info', {'fields': ('first_name', 'last_name', 'email')}),
+        ('Wallet', {'fields': ('add_balance', 'wallet')}),
+        # Add 'add_balance' here
+        ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
+        ('Status', {'fields': ('status',)}),
     )
 
     add_fieldsets = (

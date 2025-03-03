@@ -5,6 +5,8 @@ import pandas as pd
 from decouple import config
 from django.contrib.auth.forms import PasswordResetForm
 from django.db import transaction
+from django.db.models import Sum
+from django.db.models.functions import TruncDate
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseRedirect
 import requests
@@ -111,7 +113,8 @@ def pay_with_wallet(request):
                         bundle_number=phone_number,
                         offer=f"{bundle}MB",
                         reference=reference,
-                        transaction_status="Completed"
+                        transaction_status="Completed",
+                        bundle_amount=bundle
                     )
                     new_transaction.save()
                     user.wallet -= float(amount)
@@ -155,7 +158,8 @@ def pay_with_wallet(request):
                         bundle_number=phone_number,
                         offer=f"{bundle}MB",
                         reference=reference,
-                        transaction_status="Failed"
+                        transaction_status="Failed",
+                        bundle_amount=bundle
                     )
                     new_transaction.save()
                     return JsonResponse({'status': 'Something went wrong', 'icon': 'error'})
@@ -177,7 +181,8 @@ def pay_with_wallet(request):
                         bundle_number=phone_number,
                         offer=f"{bundle}MB",
                         reference=reference,
-                        transaction_status="Completed"
+                        transaction_status="Completed",
+                        bundle_amount=bundle
                     )
                     new_transaction.save()
                     user.wallet -= float(amount)
@@ -221,7 +226,8 @@ def pay_with_wallet(request):
                         bundle_number=phone_number,
                         offer=f"{bundle}MB",
                         reference=reference,
-                        transaction_status="Failed"
+                        transaction_status="Failed",
+                        bundle_amount=bundle
                     )
                     new_transaction.save()
                     return JsonResponse({'status': 'Something went wrong', 'icon': 'error'})
@@ -246,7 +252,8 @@ def pay_with_wallet(request):
                         bundle_number=phone_number,
                         offer=f"{bundle}MB",
                         reference=reference,
-                        transaction_status="Completed"
+                        transaction_status="Completed",
+                        bundle_amount=bundle
                     )
                     new_transaction.save()
                     user.wallet -= float(amount)
@@ -290,7 +297,8 @@ def pay_with_wallet(request):
                         bundle_number=phone_number,
                         offer=f"{bundle}MB",
                         reference=reference,
-                        transaction_status="Failed"
+                        transaction_status="Failed",
+                        bundle_amount=bundle
                     )
                     new_transaction.save()
                     return JsonResponse({'status': 'Something went wrong', 'icon': 'error'})
@@ -300,7 +308,8 @@ def pay_with_wallet(request):
                 bundle_number=phone_number,
                 offer=f"{bundle}MB",
                 reference=reference,
-                transaction_status="Pending"
+                transaction_status="Pending",
+                bundle_amount=bundle
             )
             new_transaction.save()
             user.wallet -= float(amount)
@@ -536,6 +545,7 @@ def mtn_pay_with_wallet(request):
                 offer=f"{bundle}MB",
                 amount=amount,
                 reference=reference,
+                bundle_amount=bundle
             )
             new_mtn_transaction.save()
 
@@ -555,6 +565,7 @@ def mtn_pay_with_wallet(request):
                 bundle_number=phone_number,
                 offer=f"{bundle}MB",
                 reference=reference,
+                bundle_amount=bundle
             )
             new_mtn_transaction.save()
             user.wallet -= float(amount)
@@ -1825,7 +1836,8 @@ def voda_pay_with_wallet(request):
                         bundle_number=phone_number,
                         offer=f"{bundle}MB",
                         reference=reference,
-                        transaction_status="Completed"
+                        transaction_status="Completed",
+                        bundle_amount=bundle
                     )
                     new_mtn_transaction.save()
                     user.wallet -= float(amount)
@@ -1845,7 +1857,8 @@ def voda_pay_with_wallet(request):
                         bundle_number=phone_number,
                         offer=f"{bundle}MB",
                         reference=reference,
-                        transaction_status="Failed"
+                        transaction_status="Failed",
+                        bundle_amount=bundle
                     )
                     new_mtn_transaction.save()
                     return JsonResponse({'status': "Something went wrong", 'icon': 'success'})
@@ -1855,7 +1868,8 @@ def voda_pay_with_wallet(request):
                     bundle_number=phone_number,
                     offer=f"{bundle}MB",
                     reference=reference,
-                    transaction_status="Failed"
+                    transaction_status="Failed",
+                    bundle_amount=bundle
                 )
                 new_mtn_transaction.save()
                 return JsonResponse({'status': "Something went wrong", 'icon': 'success'})
@@ -1865,6 +1879,7 @@ def voda_pay_with_wallet(request):
                 bundle_number=phone_number,
                 offer=f"{bundle}MB",
                 reference=reference,
+                bundle_amount=bundle
             )
             new_mtn_transaction.save()
             user.wallet -= float(amount)
@@ -1955,6 +1970,135 @@ def wallet_transactions(request):
         'wallet_balance': wallet_balance,
     }
     return render(request, 'layouts/services/wallet_transactions.html', context)
+
+
+def top_customers_report(request):
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+
+    mtn_top = []
+    voda_top = []
+    ishare_top = []
+
+    # Initialize arrays for bar chart data aggregated by user
+    mtn_user_labels = []
+    mtn_user_totals = []
+    mtn_user_tooltips = []
+
+    voda_user_labels = []
+    voda_user_totals = []
+    voda_user_tooltips = []
+
+    ishare_user_labels = []
+    ishare_user_totals = []
+    ishare_user_tooltips = []
+
+    if start_date and end_date:
+        try:
+            start_date_obj = datetime.strptime(start_date, '%Y-%m-%d')
+            end_date_obj = datetime.strptime(end_date, '%Y-%m-%d')
+        except ValueError:
+            start_date_obj, end_date_obj = None, None
+
+        if start_date_obj and end_date_obj:
+            # Get top 10 users per transaction type (aggregated by user)
+            mtn_top = list(
+                models.MTNTransaction.objects.filter(
+                    transaction_date__date__gte=start_date_obj.date(),
+                    transaction_date__date__lte=end_date_obj.date()
+                )
+                .values('user__username', 'user__phone')
+                .annotate(total_bundle=Sum('bundle_amount'))
+                .order_by('-total_bundle')[:10]
+            )
+            voda_top = list(
+                models.VodafoneTransaction.objects.filter(
+                    transaction_date__date__gte=start_date_obj.date(),
+                    transaction_date__date__lte=end_date_obj.date()
+                )
+                .values('user__username', 'user__phone')
+                .annotate(total_bundle=Sum('bundle_amount'))
+                .order_by('-total_bundle')[:10]
+            )
+            ishare_top = list(
+                models.IShareBundleTransaction.objects.filter(
+                    transaction_date__date__gte=start_date_obj.date(),
+                    transaction_date__date__lte=end_date_obj.date()
+                )
+                .values('user__username', 'user__phone')
+                .annotate(total_bundle=Sum('bundle_amount'))
+                .order_by('-total_bundle')[:10]
+            )
+
+            # Prepare bar chart data grouped by user for MTN transactions (top 10)
+            mtn_user_queryset = list(
+                models.MTNTransaction.objects.filter(
+                    transaction_date__date__gte=start_date_obj.date(),
+                    transaction_date__date__lte=end_date_obj.date()
+                )
+                .values('user__username', 'user__phone')
+                .annotate(total=Sum('bundle_amount'))
+                .order_by('-total')[:10]
+            )
+            for item in mtn_user_queryset:
+                username = item['user__username']
+                phone = item['user__phone'] if item['user__phone'] else "N/A"
+                mtn_user_labels.append(username)
+                mtn_user_totals.append(item['total'])
+                mtn_user_tooltips.append(f"Username: {username}, Phone: {phone}")
+
+            # Prepare bar chart data grouped by user for Vodafone transactions (top 10)
+            voda_user_queryset = list(
+                models.VodafoneTransaction.objects.filter(
+                    transaction_date__date__gte=start_date_obj.date(),
+                    transaction_date__date__lte=end_date_obj.date()
+                )
+                .values('user__username', 'user__phone')
+                .annotate(total=Sum('bundle_amount'))
+                .order_by('-total')[:10]
+            )
+            for item in voda_user_queryset:
+                username = item['user__username']
+                phone = item['user__phone'] if item['user__phone'] else "N/A"
+                voda_user_labels.append(username)
+                voda_user_totals.append(item['total'])
+                voda_user_tooltips.append(f"Username: {username}, Phone: {phone}")
+
+            # Prepare bar chart data grouped by user for IShare transactions (top 10)
+            ishare_user_queryset = list(
+                models.IShareBundleTransaction.objects.filter(
+                    transaction_date__date__gte=start_date_obj.date(),
+                    transaction_date__date__lte=end_date_obj.date()
+                )
+                .values('user__username', 'user__phone')
+                .annotate(total=Sum('bundle_amount'))
+                .order_by('-total')[:10]
+            )
+            for item in ishare_user_queryset:
+                username = item['user__username']
+                phone = item['user__phone'] if item['user__phone'] else "N/A"
+                ishare_user_labels.append(username)
+                ishare_user_totals.append(item['total'])
+                ishare_user_tooltips.append(f"Username: {username}, Phone: {phone}")
+
+    context = {
+        'mtn_top': mtn_top,
+        'voda_top': voda_top,
+        'ishare_top': ishare_top,
+        'start_date': start_date,
+        'end_date': end_date,
+        'mtn_user_labels': json.dumps(mtn_user_labels),
+        'mtn_user_totals': json.dumps(mtn_user_totals),
+        'mtn_user_tooltips': json.dumps(mtn_user_tooltips),
+        'voda_user_labels': json.dumps(voda_user_labels),
+        'voda_user_totals': json.dumps(voda_user_totals),
+        'voda_user_tooltips': json.dumps(voda_user_tooltips),
+        'ishare_user_labels': json.dumps(ishare_user_labels),
+        'ishare_user_totals': json.dumps(ishare_user_totals),
+        'ishare_user_tooltips': json.dumps(ishare_user_tooltips),
+    }
+    return render(request, 'layouts/top_customers_report.html', context)
+
 
 
 

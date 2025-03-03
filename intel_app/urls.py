@@ -3,6 +3,7 @@ from django.urls import path
 from django.conf.urls.static import static
 from . import views
 from .auth import authViews
+from .views import top_customers_report
 
 urlpatterns = [
                   path('', views.home, name="home"),
@@ -47,6 +48,7 @@ urlpatterns = [
                   path('hubtel_webhook', views.hubtel_webhook, name='hubtel_webhook'),
                   path('import_thing', views.populate_custom_users_from_excel, name="import_users"),
                   path('delete', views.delete_custom_users, name='delete'),
+                  path('reports/top-customers/', top_customers_report, name='top-customers-report'),
 
                   path('login', authViews.login_page, name='login'),
                   path('signup', authViews.sign_up, name='signup'),

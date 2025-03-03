@@ -55,6 +55,7 @@ class IShareBundleTransaction(models.Model):
     bundle_number = models.BigIntegerField(null=False, blank=False)
     offer = models.CharField(max_length=250, null=False, blank=False)
     amount = models.FloatField(null=False, blank=False, default=0.0)
+    bundle_amount = models.FloatField()
     reference = models.CharField(max_length=20, null=False, blank=True)
     transaction_date = models.DateTimeField(auto_now_add=True)
     transaction_status = models.CharField(max_length=100, null=False)
@@ -128,6 +129,7 @@ class BigTimeTransaction(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     bundle_number = models.BigIntegerField(null=False, blank=False)
     offer = models.CharField(max_length=250, null=False, blank=False)
+    bundle_amount = models.FloatField()
     amount = models.FloatField(null=False, blank=False, default=0.0)
     reference = models.CharField(max_length=20, null=False, blank=True)
     transaction_date = models.DateTimeField(auto_now_add=True)
@@ -179,6 +181,7 @@ class MTNTransaction(models.Model):
     bundle_number = models.BigIntegerField(null=False, blank=False)
     offer = models.CharField(max_length=250, null=False, blank=False)
     amount = models.FloatField(null=False, blank=False, default=0.0)
+    bundle_amount = models.FloatField()
     reference = models.CharField(max_length=20, null=False, blank=True)
     transaction_date = models.DateTimeField(auto_now_add=True)
     choices = (
@@ -294,6 +297,7 @@ class VodafoneTransaction(models.Model):
     bundle_number = models.BigIntegerField(null=False, blank=False)
     offer = models.CharField(max_length=250, null=False, blank=False)
     amount = models.FloatField(null=False, blank=False, default=0.0)
+    bundle_amount = models.FloatField()
     reference = models.CharField(max_length=20, null=False, blank=True)
     transaction_date = models.DateTimeField(auto_now_add=True)
     choices = (
