@@ -30,7 +30,7 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
             'Other Personal info',
             {
                 'fields': (
-                    'phone', 'add_balance', 'status', 'wallet'
+                    'add_balance', 'status', 'wallet'
                 )
             }
         )
@@ -39,7 +39,7 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('username', 'password1', 'password2', 'wallet')
+            'fields': ('phone', 'username', 'password1', 'password2', 'wallet')
         }),)
 
     def save_model(self, request, obj, form, change):
