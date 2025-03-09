@@ -49,9 +49,13 @@ def home(request):
     return render(request, "layouts/index.html", context)
 
 
+
 def services(request):
-    user = models.CustomUser.objects.get(id=request.user.id)
-    context = {"wallet": user.wallet}
+    if request.user.is_authenticated:
+        user = models.CustomUser.objects.get(id=request.user.id)
+        context = {"wallet": user.wallet}
+    else:
+        context = {'wallet': 'N/A'}
     return render(request, "layouts/services.html", context)
 
 
