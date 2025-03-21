@@ -102,7 +102,7 @@ def value_for_moni_send_bundle(user, receiver, bundle_amount, reference):
 
 
 def controller_send_bundle(receiver, bundle_amount, reference):
-    url = "https://testhub.geosams.com/controller/api/send_bundle/"
+    url = "https://www.geosams.com/controller/api/send_bundle/"
 
     payload = json.dumps({
         "phone_number": str(receiver),
