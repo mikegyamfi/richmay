@@ -102,21 +102,23 @@ def value_for_moni_send_bundle(user, receiver, bundle_amount, reference):
 
 
 def controller_send_bundle(receiver, bundle_amount, reference):
-    url = "https://www.geosams.com/controller/api/send_bundle/"
+    url = "https://api.ishareghana.com/api/transaction.php"
+    print("hello")
 
     payload = json.dumps({
-        "phone_number": str(receiver),
-        "amount": int(bundle_amount),
-        "reference": str(reference),
-        "network": "AT"
+        "agent_api": config("ISHARE_KEY_GEO"),
+        "recipient_number": str(receiver),
+        "network": "AT",
+        "gig": str(int(bundle_amount/1000)),
+        "reference_id": str(reference)
     })
+
     headers = {
-        'Authorization': config("CONTROLLER_TOKEN"),
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json"
     }
 
-    response = requests.request("POST", url, headers=headers, data=payload)
-    print(response.text)
+    response = requests.post(url, headers=headers, data=payload, timeout=15)
+    print(response.status_code)
     return response
 
 

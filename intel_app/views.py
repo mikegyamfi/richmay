@@ -250,7 +250,7 @@ def pay_with_wallet(request):
 
             sms_url = 'https://webapp.usmsgh.com/api/sms/send'
             if send_bundle_response.status_code == 200:
-                if data["code"] == "200":
+                if data["message"] == "Successful":
                     new_transaction = models.IShareBundleTransaction.objects.create(
                         user=request.user,
                         bundle_number=phone_number,
