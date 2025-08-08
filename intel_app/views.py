@@ -1211,6 +1211,7 @@ def afa_mark_as_sent(request, pk):
 @login_required(login_url='login')
 def topup_info(request):
     paystack_active = models.AdminInfo.objects.filter().first().paystack_active
+    print(paystack_active)
     if request.method == "POST":
         admin = models.AdminInfo.objects.filter().first().phone_number
         user = models.CustomUser.objects.get(id=request.user.id)
@@ -1229,7 +1230,7 @@ def topup_info(request):
         }
 
         new_topup_request.save()
-        if not models.AdminInfo.objects.filter().first().paystack_active:
+        if not paystack_active:
             sms_url = 'https://webapp.usmsgh.com/api/sms/send'
             sms_message = f"A top up request has been placed.\nGHS{amount} for {user}.\nReference: {reference}"
 
