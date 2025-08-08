@@ -3,6 +3,9 @@ import json
 import requests
 from datetime import datetime
 from decouple import config
+from django.core.exceptions import ImproperlyConfigured
+
+from intel_app.models import TopUpRequest
 
 ishare_map = {
     2: 50,
@@ -34,10 +37,27 @@ def ref_generator():
 
 
 def top_up_ref_generator():
-    now_time = datetime.now().strftime('%H%M')
-    secret = secrets.token_hex(1)
+    """
+    Generate a reference in the form TOPUP-HHMMXX where XX is a hex byte.
+    If the generated ref already exists in TopUpRequest.reference, increment
+    the hex byte by 1 (mod 256) and retry, up to 256 attempts.
+    """
+    time_str = datetime.now().strftime("%H%M")  # e.g. "1437"
+    # pick a random starting byte 0–255
+    secret_int = int(secrets.token_hex(1), 16)  # e.g. 0x3A → 58
+    for _ in range(256):
+        hex_part = f"{secret_int:02X}"  # e.g. "3A"
+        ref = f"TOPUP-{time_str}{hex_part}"  # e.g. "TOPUP-14373A"
+        # check your model for an existing record
+        if not TopUpRequest.objects.filter(reference=ref).exists():
+            return ref
+        # collision → bump and try again
+        secret_int = (secret_int + 1) % 256
 
-    return f"TOPUP-{now_time}{secret}".upper()
+    # if all 256 byte-values for this minute are exhausted, fail hard
+    raise ImproperlyConfigured(
+        "Unable to generate a unique top-up reference for this minute"
+    )
 
 
 def send_bundle(user, receiver, bundle_amount, reference):

@@ -33,6 +33,7 @@ class AdminInfo(models.Model):
     mtn_active = models.BooleanField(default=False)
     at_active = models.BooleanField(default=False)
     telecel_service_active = models.BooleanField(default=False)
+    paystack_active = models.BooleanField(default=False)
     choices = (
         ("MTN Mobile Money", "MTN Mobile Money"),
         ("Vodafone Cash", "Vodafone Cash"),

@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.forms import UserChangeForm
 from django.db import transaction
 
 from . import models
@@ -9,7 +10,7 @@ from import_export.admin import ExportActionMixin
 from .models import CustomUser, WalletTransaction
 
 
-class CustomUserAdminForm(forms.ModelForm):
+class CustomUserAdminForm(UserChangeForm):
     add_balance = forms.FloatField(required=False, label="Add Balance", help_text="Add to user's wallet balance.")
 
     class Meta:
@@ -18,9 +19,10 @@ class CustomUserAdminForm(forms.ModelForm):
 
 
 # Register your models here.
-class CustomUserAdmin(ExportActionMixin, UserAdmin):
+@admin.register(CustomUser)
+class CustomUserAdmin(UserAdmin):
     form = CustomUserAdminForm
-    model = CustomUser
+
     list_display = ['first_name', 'last_name', 'username', 'email', 'wallet', 'phone', 'status']
     search_fields = ['username']
 
@@ -28,32 +30,27 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         (None, {'fields': ('username', 'password', 'phone')}),
         ('Personal Info', {'fields': ('first_name', 'last_name', 'email')}),
         ('Wallet', {'fields': ('add_balance', 'wallet')}),
-        # Add 'add_balance' here
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
         ('Status', {'fields': ('status',)}),
     )
-
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
             'fields': ('phone', 'username', 'password1', 'password2', 'wallet')
-        }),)
+        }),
+    )
 
     def save_model(self, request, obj, form, change):
         add_balance = form.cleaned_data.get('add_balance', 0)
         if add_balance and add_balance > 0:
             try:
                 with transaction.atomic():
-                    # Lock the user record for updating the balance
-                    obj = CustomUser.objects.select_for_update().get(id=obj.id)
-
-                    # Update the user's wallet balance
+                    obj = CustomUser.objects.select_for_update().get(pk=obj.pk)
                     old_balance = obj.wallet
                     new_balance = old_balance + add_balance
                     obj.wallet = new_balance
                     obj.save()
 
-                    # Create a WalletTransaction record
                     WalletTransaction.objects.create(
                         user=obj,
                         transaction_type="Credit",
@@ -62,12 +59,12 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
                         new_balance=new_balance,
                     )
 
-                    # Send a success message
-                    messages.success(request, f"Successfully added GHS {add_balance} to {obj.username}'s wallet.")
-                    message = f"GHS{add_balance} has been added to your account"
-                    # send_sms_task.delay(obj.phone, message)
+                    messages.success(
+                        request,
+                        f"Successfully added GHS {add_balance} to {obj.username}'s wallet."
+                    )
             except Exception as e:
-                messages.error(request, f"Failed to add balance: {str(e)}")
+                messages.error(request, f"Failed to add balance: {e}")
 
         super().save_model(request, obj, form, change)
 
@@ -106,7 +103,6 @@ class WalletTransactionAdmin(admin.ModelAdmin):
     search_fields = ['user__username']
 
 
-admin.site.register(models.CustomUser, CustomUserAdmin)
 admin.site.register(models.IShareBundleTransaction, IShareBundleTransactionAdmin)
 admin.site.register(models.MTNTransaction, MTNTransactionAdmin)
 admin.site.register(models.IshareBundlePrice)

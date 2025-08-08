@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import json
 from datetime import datetime
 
@@ -8,7 +10,7 @@ from django.db import transaction
 from django.db.models import Sum
 from django.db.models.functions import TruncDate
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse, HttpResponseRedirect
+from django.http import JsonResponse, HttpResponseRedirect, HttpResponse
 import requests
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -1208,6 +1210,7 @@ def afa_mark_as_sent(request, pk):
 
 @login_required(login_url='login')
 def topup_info(request):
+    paystack_active = models.AdminInfo.objects.filter().first().paystack_active
     if request.method == "POST":
         admin = models.AdminInfo.objects.filter().first().phone_number
         user = models.CustomUser.objects.get(id=request.user.id)
@@ -1217,69 +1220,56 @@ def topup_info(request):
         new_topup_request = models.TopUpRequest.objects.create(
             user=request.user,
             amount=amount,
-            reference=str(request.user.username),
+            reference=reference,
         )
-        new_topup_request.save()
 
         sms_headers = {
             'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
             'Content-Type': 'application/json'
         }
 
-        sms_url = 'https://webapp.usmsgh.com/api/sms/send'
-        sms_message = f"A top up request has been placed.\nGHS{amount} for {user}.\nReference: {reference}"
+        new_topup_request.save()
+        if not models.AdminInfo.objects.filter().first().paystack_active:
+            sms_url = 'https://webapp.usmsgh.com/api/sms/send'
+            sms_message = f"A top up request has been placed.\nGHS{amount} for {user}.\nReference: {reference}"
 
-        sms_body = {
-            'recipient': f"233{admin}",
-            'sender_id': 'Data4All',
-            'message': sms_message
-        }
-        response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
-        print(response.text)
-        messages.success(request, f"Your Request has been sent successfully. Kindly go on to pay to {admin} and use the reference stated as reference. Reference: {str(request.user.username)}")
-        return redirect("request_successful", str(request.user.username))
-    # if request.method == "POST":
-    #     admin = models.AdminInfo.objects.filter().first().phone_number
-    #     user = models.CustomUser.objects.get(id=request.user.id)
-    #     amount = request.POST.get("amount")
-    #     print(amount)
-    #     reference = helper.top_up_ref_generator()
-    #     details = {
-    #         'topup_amount': amount
-    #     }
-    #     new_payment = models.Payment.objects.create(
-    #         user=request.user,
-    #         reference=reference,
-    #         transaction_details=details,
-    #         transaction_date=datetime.now(),
-    #         channel="topup"
-    #     )
-    #     new_payment.save()
-    #
-    #     url = "https://payproxyapi.hubtel.com/items/initiate"
-    #
-    #     payload = json.dumps({
-    #         "totalAmount": amount,
-    #         "description": "Payment for Wallet Topup",
-    #         "callbackUrl": "https://www.dataforall.store/hubtel_webhook",
-    #         "returnUrl": "https://www.dataforall.store",
-    #         "cancellationUrl": "https://www.dataforall.store",
-    #         "merchantAccountNumber": "2019735",
-    #         "clientReference": new_payment.reference
-    #     })
-    #     headers = {
-    #         'Content-Type': 'application/json',
-    #         'Authorization': 'Basic eU9XeW9nOjc3OGViODU0NjRiYjQ0ZGRiNmY3Yzk1YTUwYmJjZTAy'
-    #     }
-    #
-    #     response = requests.request("POST", url, headers=headers, data=payload)
-    #
-    #     data = response.json()
-    #
-    #     checkoutUrl = data['data']['checkoutUrl']
-    #
-    #     return redirect(checkoutUrl)
-    return render(request, "layouts/topup-info.html")
+            sms_body = {
+                'recipient': f"233{admin}",
+                'sender_id': 'Data4All',
+                'message': sms_message
+            }
+            response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
+            print(response.text)
+            messages.success(request,
+                             f"Your Request has been sent successfully. Make payment now")
+            return redirect("request_successful", reference)
+        else:
+            url = "https://api.paystack.co/transaction/initialize"
+
+            fields = {
+                'email': user.email,
+                'amount': int(int(amount) * 100),
+                'reference': new_topup_request.reference,
+                'callback_url': "https://www.dataforall.store",
+                'metadata': {
+                    'channel': "topup",
+                    'real_amount': int(amount),
+                    'db_id': user.id,
+                }
+            }
+
+            headers = {
+                "Authorization": f"Bearer {config("PAYSTACK_SECRET_KEY")}",
+                "Cache-Control": "no-cache"
+            }
+
+            response = requests.post(url, json=fields, headers=headers)
+
+            data = response.json()
+            print(data)
+            url = data['data']['authorization_url']
+            return redirect(url)
+    return render(request, "layouts/topup-info.html", context={'paystack_active': paystack_active})
 
 
 @login_required(login_url='login')
@@ -1339,7 +1329,6 @@ def credit_user_from_list(request, reference):
     # Prepare SMS details
     sms_headers = {
         'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
-        # Replace with your actual token if needed
         'Content-Type': 'application/json'
     }
     sms_url = 'https://webapp.usmsgh.com/api/sms/send'
@@ -2108,6 +2097,83 @@ def top_customers_report(request):
         messages.info(request, "Link Broken")
         return redirect('home')
 
+
+@csrf_exempt
+def paystack_webhook(request):
+    if request.method == "POST":
+        paystack_secret_key = config("PAYSTACK_SECRET_KEY")
+        # print(paystack_secret_key)
+        payload = json.loads(request.body)
+
+        paystack_signature = request.headers.get("X-Paystack-Signature")
+
+        if not paystack_secret_key or not paystack_signature:
+            return HttpResponse(status=400)
+
+        computed_signature = hmac.new(
+            paystack_secret_key.encode('utf-8'),
+            request.body,
+            hashlib.sha512
+        ).hexdigest()
+
+        if computed_signature == paystack_signature:
+            print("yes")
+            print(payload.get('data'))
+            r_data = payload.get('data')
+            print(r_data.get('metadata'))
+            print(payload.get('event'))
+            if payload.get('event') == 'charge.success':
+
+                try:
+                    metadata = r_data.get('metadata')
+                    db_id = metadata.get('db_id')
+                    print(db_id)
+                    user = models.CustomUser.objects.get(id=int(db_id))
+                    print(user)
+                    channel = metadata.get('channel')
+                    real_amount = metadata.get('real_amount')
+                    print(real_amount)
+
+
+                    paid_amount = r_data.get('amount')
+
+                    reference = r_data.get('reference')
+
+                    if channel == "topup":
+                        if models.TopUpRequest.objects.filter(reference=reference, status=True).exists():
+                            return HttpResponse(status=200)
+                        try:
+                            amount = real_amount
+                            with transaction.atomic():
+                                user.wallet += float(amount)
+                                user.save()
+
+                                topup_request = models.TopUpRequest.objects.get(reference=reference)
+                                topup_request.status = True
+                                topup_request.save()
+
+                                new_wallet_transaction = models.WalletTransaction.objects.create(
+                                    user=user,
+                                    transaction_type="Credit",
+                                    transaction_amount=float(amount),
+                                    transaction_use=f"Top up (Paystack) ({reference})",
+                                    new_balance=user.wallet
+                                )
+                                new_wallet_transaction.save()
+                            return HttpResponse(status=200)
+                        except Exception as e:
+                            print(e)
+                            return HttpResponse(status=200)
+                    else:
+                        return HttpResponse(status=200)
+                except Exception as e:
+                    print(e)
+                    return HttpResponse(status=200)
+            else:
+                return HttpResponse(status=200)
+        else:
+            return HttpResponse(status=401)
+    return HttpResponse(status=200)
 
 
 
