@@ -524,74 +524,36 @@ def mtn_pay_with_wallet(request):
         user_id = 'config("USER_ID")'
         print(api_status)
 
-        if api_status is True:
-            print("api")
-            url = "https://posapi.bestpaygh.com/api/v1/initiate_mtn_transaction"
 
-            payload = json.dumps({
-                "user_id": user_id,
-                "receiver": phone_number,
-                "data_volume": bundle,
-                "reference": reference,
-                "amount": amount,
-                "channel": phone
-            })
-            headers = {
-                'Authorization': auth,
-                'Content-Type': 'application/json'
-            }
-            response = requests.request("POST", url, headers=headers, data=payload)
 
-            print(response.text)
-            user.wallet -= float(amount)
-            user.save()
-            new_mtn_transaction = models.MTNTransaction.objects.create(
-                user=request.user,
-                bundle_number=phone_number,
-                offer=f"{bundle}MB",
-                amount=amount,
-                reference=reference,
-                bundle_amount=bundle
-            )
-            new_mtn_transaction.save()
+        print("used else")
+        sms_message = f"An order has been placed. {bundle}MB for {phone_number}"
+        new_mtn_transaction = models.MTNTransaction.objects.create(
+            user=request.user,
+            bundle_number=phone_number,
+            offer=f"{bundle}MB",
+            reference=reference,
+            bundle_amount=bundle
+        )
+        new_mtn_transaction.save()
+        user.wallet -= float(amount)
+        user.save()
 
-            models.WalletTransaction.objects.create(
-                user=user,
-                transaction_type='Debit',
-                transaction_amount=amount,
-                transaction_use='MTN Bundle Purchase',
-                new_balance=user.wallet,
-            )
-            return JsonResponse({'status': "Your transaction will be completed shortly", 'icon': 'success'})
-        else:
-            print("used else")
-            sms_message = f"An order has been placed. {bundle}MB for {phone_number}"
-            new_mtn_transaction = models.MTNTransaction.objects.create(
-                user=request.user,
-                bundle_number=phone_number,
-                offer=f"{bundle}MB",
-                reference=reference,
-                bundle_amount=bundle
-            )
-            new_mtn_transaction.save()
-            user.wallet -= float(amount)
-            user.save()
-
-            models.WalletTransaction.objects.create(
-                user=user,
-                transaction_type='Debit',
-                transaction_amount=amount,
-                transaction_use='MTN Bundle Purchase',
-                new_balance=user.wallet,
-            )
-            sms_body = {
-                'recipient': "233540975553",
-                'sender_id': 'Data4All',
-                'message': sms_message
-            }
-            # response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
-            # print(response.text)
-            return JsonResponse({'status': "Your transaction will be completed shortly", 'icon': 'success'})
+        models.WalletTransaction.objects.create(
+            user=user,
+            transaction_type='Debit',
+            transaction_amount=amount,
+            transaction_use='MTN Bundle Purchase',
+            new_balance=user.wallet,
+        )
+        sms_body = {
+            'recipient': "233540975553",
+            'sender_id': 'Data4All',
+            'message': sms_message
+        }
+        # response = requests.request('POST', url=sms_url, params=sms_body, headers=sms_headers)
+        # print(response.text)
+        return JsonResponse({'status': "Your transaction will be completed shortly", 'icon': 'success'})
     return redirect('mtn')
 
 
