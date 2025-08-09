@@ -1830,24 +1830,25 @@ def voda_pay_with_wallet(request):
                 new_mtn_transaction.save()
                 return JsonResponse({'status': "Something went wrong", 'icon': 'success'})
         else:
-            new_mtn_transaction = models.VodafoneTransaction.objects.create(
-                user=request.user,
-                bundle_number=phone_number,
-                offer=f"{bundle}MB",
-                reference=reference,
-                bundle_amount=bundle
-            )
-            new_mtn_transaction.save()
-            user.wallet -= float(amount)
-            user.save()
+            with transaction.atomic():
+                new_mtn_transaction = models.VodafoneTransaction.objects.create(
+                    user=request.user,
+                    bundle_number=phone_number,
+                    offer=f"{bundle}MB",
+                    reference=reference,
+                    bundle_amount=bundle
+                )
+                new_mtn_transaction.save()
+                user.wallet -= float(amount)
+                user.save()
 
-            models.WalletTransaction.objects.create(
-                user=user,
-                transaction_type='Debit',
-                transaction_amount=amount,
-                transaction_use='Telecel Bundle Purchase',
-                new_balance=user.wallet,
-            )
+                models.WalletTransaction.objects.create(
+                    user=user,
+                    transaction_type='Debit',
+                    transaction_amount=amount,
+                    transaction_use='Telecel Bundle Purchase',
+                    new_balance=user.wallet,
+                )
             sms_message = f"Telecel order has been placed. {bundle}MB for {phone_number}. Reference: {reference}"
             sms_headers = {
                 'Authorization': 'Bearer 1135|1MWAlxV4XTkDlfpld1VC3oRviLhhhZIEOitMjimq',
