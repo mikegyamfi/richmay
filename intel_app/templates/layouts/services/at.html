@@ -41,7 +41,7 @@
                 <div class="form-group col-md-6">
                   <label for="phone">Phone Number</label>
                   {{form.phone_number}}
-                  <small>Number must be 10 digits. E.g. 0270000000</small>
+                  <small>Number must be 10 digits. E.g., 0270000000</small>
                 </div>
                 <div class="form-group col-md-6">
                   <label for="inputPassword4">Bundle Offer</label>
@@ -53,7 +53,7 @@
               <button type="button" class="btn btn-primary pay-with-wallet">Pay with Wallet</button>
               <a style="display: none" class="spinner-border process text-primary mt-2" role="status"></a>
               <h6 class="mt-2"><i class="fa fa-money"></i> Wallet Balance: GHS {{wallet}}</h6>
-              <a href="{% url 'topup-info'%}">Want to top up your wallet? Click here!</a>
+              <a href="{% url 'topup-info'%}">Click here for instant topup</a>
             </form>
           </div>
   </div> <!-- .page-section -->
