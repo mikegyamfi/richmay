@@ -20,19 +20,25 @@ from intel_app.models import CustomUser
 
 
 def sign_up(request):
-    form = CustomUserForm()
     if request.method == 'POST':
         form = CustomUserForm(request.POST)
         if form.is_valid():
-            username = form.cleaned_data.get('username')
+            username = form.cleaned_data['username']
             if models.CustomUser.objects.filter(username=username).exists():
                 messages.error(request, 'Username already exists')
                 return redirect('login')
-            form.save()
+
+            user = form.save(commit=False)
+            user.status = "User"
+            user.set_password(form.cleaned_data['password1'])
+            user.save()
+
             messages.success(request, "Sign Up Successful. Log in to continue.")
             return redirect('login')
-    context = {'form': form}
-    return render(request, 'auth/signup.html', context=context)
+    else:
+        form = CustomUserForm()
+
+    return render(request, 'auth/signup.html', {'form': form})
 
 
 def login_page(request):
