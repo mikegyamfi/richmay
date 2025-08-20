@@ -533,7 +533,8 @@ def mtn_pay_with_wallet(request):
             bundle_number=phone_number,
             offer=f"{bundle}MB",
             reference=reference,
-            bundle_amount=bundle
+            bundle_amount=bundle,
+            transaction_status="Pending"
         )
         new_mtn_transaction.save()
         user.wallet -= float(amount)
@@ -1101,10 +1102,26 @@ def admin_mtn_history(request, status):
         return redirect('mtn_admin', status=status)
 
     if request.method != "POST":
-        txns = models.MTNTransaction.objects.filter(
-            transaction_status=status
-        ).order_by('-transaction_date')[:800]
-        return render(request, "layouts/services/mtn_admin.html", {"txns": txns, "status": status})
+        STATUS_MAP = {
+            "pending": "Pending",
+            "processing": "Processing",
+            "completed": "Completed",
+            "failed": "Failed",
+            "cancelled": "Cancelled",
+        }
+        raw = (status or "").strip().lower()
+        wanted_status = STATUS_MAP.get(raw, "Pending")
+
+        txns = (
+            models.MTNTransaction.objects
+            .filter(transaction_status__iexact=wanted_status)
+            .order_by('-transaction_date')[:800]
+        )
+        return render(
+            request,
+            "layouts/services/mtn_admin.html",
+            {"txns": txns, "status": wanted_status}
+        )
 
     uploaded_file = request.FILES.get('file')
     if not uploaded_file:
