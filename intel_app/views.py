@@ -1,7 +1,9 @@
 import hashlib
 import hmac
 import json
+import re
 from datetime import datetime
+from io import BytesIO
 
 import pandas as pd
 from decouple import config
@@ -17,6 +19,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import urlsafe_base64_encode
 from django.views.decorators.csrf import csrf_exempt
+from openpyxl import load_workbook
 
 from . import forms
 from django.contrib import messages
@@ -49,7 +52,6 @@ def home(request):
 
     print(context)
     return render(request, "layouts/index.html", context)
-
 
 
 def services(request):
@@ -467,7 +469,8 @@ def airtel_tigo(request):
             #     # print(response.text)
             #     return JsonResponse({'status': 'Something went wrong', 'icon': 'error'})
         user = models.CustomUser.objects.get(id=request.user.id)
-        context = {"form": form, "ref": reference, "email": user_email, "wallet": 0 if user.wallet is None else user.wallet}
+        context = {"form": form, "ref": reference, "email": user_email,
+                   "wallet": 0 if user.wallet is None else user.wallet}
         return render(request, "layouts/services/at.html", context=context)
     else:
         messages.info(request, "Ishare Service is not active. Try again later")
@@ -494,7 +497,6 @@ def mtn_pay_with_wallet(request):
         sms_url = 'https://webapp.usmsgh.com/api/sms/send'
         admin = models.AdminInfo.objects.filter().first().phone_number
         api_status = models.AdminInfo.objects.filter().first().mtn_api_status
-
 
         if float(user.wallet) - float(amount) < 0:
             return JsonResponse(
@@ -523,8 +525,6 @@ def mtn_pay_with_wallet(request):
         auth = 'config("AT")'
         user_id = 'config("USER_ID")'
         print(api_status)
-
-
 
         print("used else")
         sms_message = f"An order has been placed. {bundle}MB for {phone_number}"
@@ -666,7 +666,6 @@ def mtn(request):
 
                 return redirect(checkoutUrl)
 
-
             # amount_paid = request.POST.get("amount")
             # new_payment = models.Payment.objects.create(
             #     user=request.user,
@@ -726,7 +725,8 @@ def mtn(request):
             mtn_offer = models.MTNBundlePrice.objects.all()
         for offer in mtn_offer:
             mtn_dict[str(offer)] = offer.bundle_volume
-        context = {'form': form, 'phone_num': phone_num, 'auth': auth, 'user_id': user_id, 'mtn_dict': json.dumps(mtn_dict),
+        context = {'form': form, 'phone_num': phone_num, 'auth': auth, 'user_id': user_id,
+                   'mtn_dict': json.dumps(mtn_dict),
                    "ref": reference, "email": user_email, "wallet": 0 if user.wallet is None else user.wallet}
         return render(request, "layouts/services/mtn.html", context=context)
     else:
@@ -994,11 +994,224 @@ def admin_at_history(request):
 
 
 @login_required(login_url='login')
-def admin_mtn_history(request):
-    if request.user.is_staff and request.user.is_superuser:
-        all_txns = models.MTNTransaction.objects.filter().order_by('-transaction_date')[:500]
-        context = {'txns': all_txns}
-        return render(request, "layouts/services/mtn_admin.html", context=context)
+def change_excel_status(request, status, to_change_to):
+    if to_change_to != "Completed":
+        updated = (
+            models.MTNTransaction.objects
+            .filter(transaction_status=status)
+            .update(transaction_status=to_change_to)
+        )
+        messages.success(
+            request,
+            f"Status changed from {status} to {to_change_to} for {updated} transaction(s)."
+        )
+        return redirect("mtn_admin", status=status)
+
+    with transaction.atomic():
+        ids_to_complete = list(
+            models.MTNTransaction.objects
+            .select_for_update()
+            .filter(transaction_status=status)
+            .order_by("transaction_date")
+            .values_list("pk", flat=True)
+        )
+
+        if not ids_to_complete:
+            messages.info(request, f"No transactions with status '{status}' found to complete.")
+            return redirect("mtn_admin", status=status)
+
+        updated = (
+            models.MTNTransaction.objects
+            .filter(pk__in=ids_to_complete, transaction_status=status)
+            .update(transaction_status="Completed")
+        )
+
+    if updated > 0:
+        messages.success(
+            request,
+            f"Marked {updated} transaction(s) as Completed (oldest first)."
+        )
+    else:
+        messages.warning(
+            request,
+            "No transactions changed to Completed (they may have been updated concurrently)."
+        )
+
+    return redirect("mtn_admin", status=status)
+
+
+from django.db.models import FloatField
+from django.db.models.functions import Cast, Substr, Length
+
+
+def _parse_offer_to_gb_int(offer_str: str) -> int:
+    if not offer_str:
+        return 0
+    s = str(offer_str).strip().replace(',', '').upper()
+    m_mb = re.search(r'([\d.]+)\s*MB', s)
+    m_gb = re.search(r'([\d.]+)\s*GB', s)
+    if m_mb:
+        val_mb = float(m_mb.group(1))
+        return int(round(val_mb / 1000.0))
+    if m_gb:
+        return int(round(float(m_gb.group(1))))
+    try:
+        val = float(s)
+        return int(round(val / 1000.0))
+    except Exception as e:
+        print(e)
+        return 0
+
+
+def _find_columns_by_header(ws):
+    header_map = {}
+    for col in range(1, ws.max_column + 1):
+        raw = ws.cell(row=1, column=col).value
+        if raw is None:
+            continue
+        name = str(raw).strip().lower()
+        header_map[name] = col
+
+    number_headers = ["number", "recipient", "phone", "msisdn", "bundle number"]
+    gb_headers = ["gb", "data", "bundle", "data (gb)"]
+
+    number_col = next((header_map[h] for h in number_headers if h in header_map), None)
+    gb_col = next((header_map[h] for h in gb_headers if h in header_map), None)
+    return number_col, gb_col
+
+
+def _first_empty_row(ws, cols, start_row=2):
+    r = max(start_row, 2)
+    while True:
+        non_empty = False
+        for c in cols:
+            val = ws.cell(row=r, column=c).value
+            if val not in (None, ""):
+                non_empty = True
+                break
+        if not non_empty:
+            return r
+        r += 1
+
+
+@login_required(login_url='login')
+def admin_mtn_history(request, status):
+    if not (request.user.is_staff and request.user.is_superuser):
+        messages.error(request, "Access Denied")
+        return redirect('mtn_admin', status=status)
+
+    if request.method != "POST":
+        txns = models.MTNTransaction.objects.filter(
+            transaction_status=status
+        ).order_by('-transaction_date')[:800]
+        return render(request, "layouts/services/mtn_admin.html", {"txns": txns, "status": status})
+
+    uploaded_file = request.FILES.get('file')
+    if not uploaded_file:
+        messages.error(request, "No excel file found")
+        return redirect('mtn_admin', status=status)
+
+    try:
+        in_buf = BytesIO(uploaded_file.read())
+        book = load_workbook(in_buf)
+        ws = book.active
+
+        number_col, gb_col = _find_columns_by_header(ws)
+
+        if number_col is None or gb_col is None:
+            for alt in book.worksheets:
+                number_col, gb_col = _find_columns_by_header(alt)
+                if number_col and gb_col:
+                    ws = alt
+                    break
+
+        if number_col is None or gb_col is None:
+            ws = book.active
+            number_col, gb_col = 1, 2
+            if ws.cell(row=1, column=number_col).value in (None, "") and ws.cell(row=1, column=gb_col).value in (None,
+                                                                                                                 ""):
+                ws.cell(row=1, column=number_col, value="Number")
+                ws.cell(row=1, column=gb_col, value="GB")
+
+        next_row = _first_empty_row(ws, cols=[number_col, gb_col], start_row=2)
+
+        qs = (
+            models.MTNTransaction.objects
+            .filter(transaction_status="Pending")
+            .only("pk", "bundle_number", "offer")
+            .iterator(chunk_size=500)
+        )
+
+        prepared_ids = []
+        rows_written = 0
+
+        for record in qs:
+            number_text = f"0{record.bundle_number}"
+            ws.cell(row=next_row, column=number_col, value=f"{number_text}")
+            ws.cell(row=next_row, column=gb_col, value=_parse_offer_to_gb_int(record.offer))
+
+            prepared_ids.append(record.pk)
+            rows_written += 1
+            next_row += 1
+
+        out_buf = BytesIO()
+        book.save(out_buf)
+        out_buf.seek(0)
+
+    except Exception as exc:
+        messages.error(request, f"Failed to prepare Excel: {exc}")
+        return redirect('mtn_admin', status=status)
+
+    db_update_ok = True
+    updated_count = 0
+
+    if prepared_ids:
+        try:
+            with transaction.atomic():
+                updated_count = (
+                    models.MTNTransaction.objects
+                    .filter(pk__in=prepared_ids, transaction_status="Pending")
+                    .update(transaction_status="Processing")
+                )
+        except Exception as exc:
+            db_update_ok = False
+            messages.error(
+                request,
+                "Excel was generated, but updating DB statuses failed. "
+                "Please download this file and try again. Error: {}".format(exc)
+            )
+    else:
+        messages.warning(request, "No Pending transactions found to export.")
+
+    # Feedback
+    if prepared_ids and db_update_ok and updated_count:
+        messages.success(
+            request,
+            f"Prepared Excel with {rows_written} rows and marked {updated_count} as Processing."
+        )
+    elif prepared_ids and db_update_ok and updated_count == 0:
+        messages.warning(
+            request,
+            "Prepared Excel, but none were marked Processing (they may have changed concurrently). "
+            "You can safely retry."
+        )
+    elif prepared_ids and not db_update_ok:
+        messages.error(
+            request,
+            "Database update did NOT complete. The downloaded Excel matches the selected Pending set; "
+            "re-run this export after resolving the issue."
+        )
+
+    # Always return the Excel so no work is lost
+    suffix = "-NEEDS-RETRY" if prepared_ids and not db_update_ok else ""
+    response = HttpResponse(
+        out_buf.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename={}.xlsx'.format(
+        datetime.now().strftime(f"%Y-%m-%d-%H-%M-%S{suffix}")
+    )
+    return response
 
 
 @login_required(login_url='login')
@@ -1629,6 +1842,7 @@ def delete_custom_users(request):
 from django.utils.encoding import force_bytes
 from django.contrib.auth.tokens import default_token_generator
 
+
 def password_reset_request(request):
     if request.method == "POST":
         password_reset_form = PasswordResetForm(request.POST)
@@ -1686,31 +1900,31 @@ def voda(request):
         db_user_id = request.user.id
 
         # if request.method == "POST":
-            # payment_reference = request.POST.get("reference")
-            # amount_paid = request.POST.get("amount")
-            # new_payment = models.Payment.objects.create(
-            #     user=request.user,
-            #     reference=payment_reference,
-            #     amount=amount_paid,
-            #     transaction_date=datetime.now(),
-            #     transaction_status="Pending"
-            # )
-            # new_payment.save()
-            # phone_number = request.POST.get("phone")
-            # offer = request.POST.get("amount")
-            # bundle = models.VodaBundlePrice.objects.get(
-            #     price=float(offer)).bundle_volume if user.status == "User" else models.AgentVodaBundlePrice.objects.get(
-            #     price=float(offer)).bundle_volume
-            #
-            # print(phone_number)
-            # new_mtn_transaction = models.VodafoneTransaction.objects.create(
-            #     user=request.user,
-            #     bundle_number=phone_number,
-            #     offer=f"{bundle}MB",
-            #     reference=payment_reference,
-            # )
-            # new_mtn_transaction.save()
-            # return JsonResponse({'status': "Your transaction will be completed shortly", 'icon': 'success'})
+        # payment_reference = request.POST.get("reference")
+        # amount_paid = request.POST.get("amount")
+        # new_payment = models.Payment.objects.create(
+        #     user=request.user,
+        #     reference=payment_reference,
+        #     amount=amount_paid,
+        #     transaction_date=datetime.now(),
+        #     transaction_status="Pending"
+        # )
+        # new_payment.save()
+        # phone_number = request.POST.get("phone")
+        # offer = request.POST.get("amount")
+        # bundle = models.VodaBundlePrice.objects.get(
+        #     price=float(offer)).bundle_volume if user.status == "User" else models.AgentVodaBundlePrice.objects.get(
+        #     price=float(offer)).bundle_volume
+        #
+        # print(phone_number)
+        # new_mtn_transaction = models.VodafoneTransaction.objects.create(
+        #     user=request.user,
+        #     bundle_number=phone_number,
+        #     offer=f"{bundle}MB",
+        #     reference=payment_reference,
+        # )
+        # new_mtn_transaction.save()
+        # return JsonResponse({'status': "Your transaction will be completed shortly", 'icon': 'success'})
         user = models.CustomUser.objects.get(id=request.user.id)
         # phone_num = user.phone
         # mtn_dict = {}
@@ -1722,7 +1936,8 @@ def voda(request):
         # for offer in mtn_offer:
         #     mtn_dict[str(offer)] = offer.bundle_volume
         context = {'form': form,
-                   "ref": reference, "email": user_email, "wallet": 0 if user.wallet is None else user.wallet, 'id': db_user_id}
+                   "ref": reference, "email": user_email, "wallet": 0 if user.wallet is None else user.wallet,
+                   'id': db_user_id}
         return render(request, "layouts/services/voda.html", context=context)
     else:
         messages.info(request, "Telecel Service is not active. Try again later")
@@ -2098,7 +2313,6 @@ def paystack_webhook(request):
                     real_amount = metadata.get('real_amount')
                     print(real_amount)
 
-
                     paid_amount = r_data.get('amount')
 
                     reference = r_data.get('reference')
@@ -2138,25 +2352,3 @@ def paystack_webhook(request):
         else:
             return HttpResponse(status=401)
     return HttpResponse(status=200)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
