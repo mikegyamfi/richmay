@@ -16,14 +16,12 @@
             <a href="mailto:richmondaddae108@gmail.com" class="nav-link">Contact</a>
           </li>
           {% if request.user.is_authenticated %}
-          {% if wallet %}
           <li class="nav-item">
             <a href="{% url 'topup-info' %}" class="nav-link">Wallet Balance: {{wallet}}</a>
           </li>
               <li class="nav-item">
             <a href="{% url 'topup-info' %}" class="nav-link">Instant Topup</a>
           </li>
-          {% endif %}
           <li class="nav-item">
             <a href="{% url 'history' %}" class="nav-link">Dashboard</a>
           </li>

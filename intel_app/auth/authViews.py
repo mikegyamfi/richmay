@@ -30,6 +30,7 @@ def sign_up(request):
 
             user = form.save(commit=False)
             user.status = "User"
+            user.wallet = 0.0
             user.set_password(form.cleaned_data['password1'])
             user.save()
 
