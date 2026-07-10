@@ -1,8 +1,14 @@
+from datetime import datetime
+from io import BytesIO
+
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserChangeForm
 from django.db import transaction
+from django.http import HttpResponse
+from django.urls import path
+from openpyxl import Workbook
 
 from . import models
 from import_export.admin import ExportActionMixin
@@ -78,6 +84,50 @@ class IShareBundleTransactionAdmin(admin.ModelAdmin):
 class MTNTransactionAdmin(ExportActionMixin, admin.ModelAdmin):
     list_display = ['user', 'bundle_number', 'offer', 'reference', 'transaction_status', 'transaction_date']
     search_fields = ['reference', 'bundle_number']
+    change_list_template = "admin/mtn_transaction_change_list.html"
+
+    def get_urls(self):
+        custom_urls = [
+            path(
+                'export-unique-numbers/',
+                self.admin_site.admin_view(self.export_unique_numbers),
+                name='mtn_export_unique_numbers',
+            ),
+        ]
+        return custom_urls + super().get_urls()
+
+    def export_unique_numbers(self, request):
+        numbers = (
+            models.MTNTransaction.objects
+            .exclude(bundle_number__isnull=True)
+            .values_list('bundle_number', flat=True)
+            .distinct()
+            .order_by('bundle_number')
+        )
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "MTN Numbers"
+        ws.cell(row=1, column=1, value="Number")
+
+        row = 2
+        for number in numbers:
+            ws.cell(row=row, column=1, value=f"0{number}")
+            row += 1
+
+        out_buf = BytesIO()
+        wb.save(out_buf)
+        out_buf.seek(0)
+
+        response = HttpResponse(
+            out_buf.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        filename = "mtn-unique-numbers-{}.xlsx".format(
+            datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        )
+        response['Content-Disposition'] = f'attachment; filename={filename}'
+        return response
 
 
 class PaymentAdmin(admin.ModelAdmin):
